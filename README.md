@@ -2,6 +2,8 @@
 
 Make drawer-front labels for file cabinets, starting with BISLEY. Enter a drawer's ID, name and contents. File Ctrl checks the name, finds an icon no other drawer uses, shows the label as it looks through the holder, and saves files ready to print.
 
+**Printer required.** You need a [Liene PixCut S1](https://www.liene-life.com/products/pixcut-s1-photo-sticker-printer-and-cutter) to print and cut these labels. It's the only printer File Ctrl is tested on. The Letter and A4 PDFs print on any printer, and you cut those by hand.
+
 Everything runs in your browser. It makes no network requests after it loads, and your registry never leaves your computer.
 
 Live at https://woodwerd.github.io/file-ctrl/ once published. To run it locally:
