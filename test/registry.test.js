@@ -44,6 +44,7 @@ test('FC-A11 unknown words are said to be unknown', () => {
 test('name check covers duplicate, fit and mismatch', () => {
   assert.equal(nameCheck(row({ name: 'Wire', contents: 'Hookup wire' }), SEED, true).kind, 'duplicate');
   assert.equal(nameCheck(row({ name: 'Instrument cables', contents: 'Probes' }), SEED, false).suggestion, 'Instrument');
+  assert.equal(checks(fonts, std, row({ name: 'Hand tool storage' , contents: 'Bins' }), SEED, UNITS).some((c) => c.id === 'FC-K03'), false);
   const m = nameCheck(row({ name: 'Stuff', contents: 'Glue, epoxy, threadlocker' }), SEED, true);
   assert.equal(m.kind, 'mismatch'); assert.equal(m.suggestion, 'Adhesives');
 });
@@ -77,8 +78,8 @@ test('FC-A16 registry round trips through CSV and JSON', () => {
 test('checks use plain words', () => {
   const k = (o, u = UNITS) => checks(fonts, std, row(o), SEED, u).map((c) => c.id);
   assert.ok(k({ name: '', icon: '' }).includes('FC-K01'));
-  assert.ok(k({ name: 'Instrumentation and measurement cables' }).includes('FC-K02'));
-  assert.ok(k({ name: 'Instrument cables' }).includes('FC-K03'));
+  assert.ok(k({ name: 'Instrumentationandmeasurementcables' }).includes('FC-K02'));
+  assert.ok(k({ name: 'Instrumentations' }).includes('FC-K03'));
   assert.ok(k({ id: '12', name: 'Parts' }).includes('FC-K06'));
   assert.ok(!k({ id: '12', name: 'Parts' }, []).includes('FC-K06'));
   assert.ok(k({ id: 'F1', name: 'Parts' }).includes('FC-K07'));

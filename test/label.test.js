@@ -15,8 +15,8 @@ const fonts = parseFonts(buf('site/fonts/InterTight-700.ttf'), buf('site/fonts/I
 const std = standardByKey('bisley');
 const geo = derive(std);
 const near = (a, b, tol = 0.01) => assert.ok(Math.abs(a - b) <= tol, `${a} vs ${b}`);
-// Contents line counts read from the 16 golden PNGs
-const LINES = { D1: 2, D2: 1, D3: 2, '01': 1, '02': 2, '03': 2, '04': 2, '05': 2, '06': 2, '07': 2, '08': 1, '09': 2, 10: 2, F1: 2, F2: 1, F3: 2 };
+// Label v4: name pt, name lines, contents pt, contents lines
+const V4 = { D1: [11.5, 1, 5.5, 2], D2: [11.5, 1, 5.5, 2], D3: [11.5, 1, 5.5, 2], '01': [11.5, 1, 5.5, 1], '02': [11.5, 2, 5.5, 2], '03': [11.5, 1, 5.5, 2], '04': [11.5, 1, 5.5, 2], '05': [11.5, 1, 5.5, 2], '06': [11.5, 1, 5.5, 2], '07': [11.5, 1, 5.5, 2], '08': [9.25, 1, 5.5, 2], '09': [11.5, 1, 5.5, 2], 10: [11.25, 1, 5.5, 2], F1: [11.5, 1, 5.5, 2], F2: [11.5, 1, 5.5, 2], F3: [11.5, 1, 5.5, 2] };
 
 test('FC-A01 geometry', () => {
   assert.deepEqual(geo.file, { w: 44, h: 22 });
@@ -25,19 +25,19 @@ test('FC-A01 geometry', () => {
   assert.equal(geo.W, 520); assert.equal(geo.H, 260);
 });
 
-test('FC-A03 seeds match the goldens', () => {
+test('FC-A02 and FC-A03 seeds match the v4 table', () => {
   near(textArea(geo).width / 300 * 25.4, 23.79);
   for (const d of SEED) {
     const f = fitLabel(fonts, geo, d.name, d.contents);
-    assert.equal(f.namePt, 9, d.id); assert.equal(f.contentsPt, 4.75, d.id);
-    assert.equal(f.lines.length, LINES[d.id], d.id);
+    assert.deepEqual([f.namePt, f.nameLines.length, f.contentsPt, f.lines.length], V4[d.id], d.id);
   }
 });
 
 test('FC-A04 name shrinks in 0.25 steps and stops at 6 pt', () => {
-  const a = fitLabel(fonts, geo, 'Instrument cables', 'x');
+  const a = fitLabel(fonts, geo, 'Instrumentation', 'x');
   assert.ok(a.namePt < 9 && a.namePt >= 6 && a.namePt * 4 === Math.round(a.namePt * 4));
-  const b = fitLabel(fonts, geo, 'Instrumentation and measurement cables', 'x');
+  assert.equal(fitLabel(fonts, geo, 'Hand tools', 'x').nameLines.length, 2);
+  const b = fitLabel(fonts, geo, 'Instrumentationandmeasurementcables', 'x');
   assert.equal(b.namePt, 6); assert.ok(b.nameOver);
 });
 

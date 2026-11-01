@@ -1,5 +1,5 @@
 // The 16 labels in label-registry.md (FC-R22). Generic drawer categories, no home details.
-const row = (id, name, contents, icon, weak) => ({ id, name, contents, icon, icon_source: 'tabler', custom_svg: '', icon_weak: !!weak, version: 'v3', status: 'built', updated: '2026-10-30' });
+const row = (id, name, contents, icon, weak) => ({ id, name, contents, icon, icon_source: 'tabler', custom_svg: '', icon_weak: !!weak, version: 'v4', status: 'built', updated: '2026-10-30' });
 
 export const SEED = [
   row('D1', 'Test', 'Meter, leads, logic analyzer, calipers', 'circuit-voltmeter'),

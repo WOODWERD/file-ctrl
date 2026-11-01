@@ -34,7 +34,7 @@ export function normalise(o) {
   d.icon_weak = d.icon_weak === true || String(d.icon_weak).toLowerCase() === 'true';
   d.icon_source = d.icon_source === 'custom' ? 'custom' : 'tabler';
   if (!STATUS.includes(d.status)) d.status = 'built';
-  d.version = d.version || 'v3';
+  d.version = d.version || 'v4';
   return d;
 }
 

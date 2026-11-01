@@ -1,5 +1,5 @@
 // Offline copy of the app. Online always gets the newest files; the saved copy is only the fallback.
-const VERSION = 'file-ctrl-x0.0.1';
+const VERSION = 'file-ctrl-x0.0.2';
 const FILES = ['./', 'index.html', 'guide.html', 'tokens.css', 'styles.css', 'chrome.js', 'app.js', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png',
   'label/standards.js', 'label/geometry.js', 'label/fit.js', 'label/fonts.js', 'label/render.js',
   'registry/seed.js', 'registry/store.js', 'registry/csv.js', 'registry/uniqueness.js',

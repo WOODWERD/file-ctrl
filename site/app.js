@@ -1,7 +1,7 @@
 // File Ctrl interface. Three Areas: Drawers, Label, Print (FC-U05). State IDs in comments match the spec.
 import { STANDARDS, standardByKey } from './label/standards.js';
 import { derive } from './label/geometry.js';
-import { fitLabel, textArea, nameWidth } from './label/fit.js';
+import { fitLabel } from './label/fit.js';
 import { loadFonts } from './label/fonts.js';
 import { renderLabel, renderProof } from './label/render.js';
 import { SEED, UNITS } from './registry/seed.js';
@@ -124,7 +124,7 @@ function area1() {
 }
 
 /* ---- Label flow (Area 2) ---- */
-const blank = () => ({ id: '', name: '', contents: '', icon: '', icon_source: 'tabler', custom_svg: '', icon_weak: false, version: 'v3', status: 'built', updated: '' });
+const blank = () => ({ id: '', name: '', contents: '', icon: '', icon_source: 'tabler', custom_svg: '', icon_weak: false, version: 'v4', status: 'built', updated: '' });
 
 function startFlow(d) {
   S.flow = { step: d ? 2 : 1, isNew: !d, inUse: false, draft: d ? { ...d } : blank(), result: null, query: '', custom: false, svgText: '', svgFails: [] };
@@ -132,7 +132,7 @@ function startFlow(d) {
 }
 
 const fitNow = (d) => fitLabel(fonts, derive(S.std), d.name, d.contents);
-const fits9 = (d) => { const g = derive(S.std); return nameWidth(fonts, (d.name || '').toUpperCase(), g.pt(9)) <= textArea(g).width; };
+const fits9 = (d) => fitNow(d).namePt >= 9;
 
 function iconResults(q) {
   const words = q.toLowerCase().split(/[\s,]+/).filter((w) => w.length > 1).map((w) => w.replace(/s$/, ''));
@@ -183,7 +183,7 @@ function iconPanel(f) {
     const tag = u ? `Used by ${u.id}` : n === d.icon ? 'Selected' : cand.includes(n) ? 'Candidate' : '';
     return `<button class="icb" type="button" data-act="icon" data-v="${n}" ${u ? 'disabled' : ''} aria-pressed="${n === d.icon}" aria-label="${n}${tag ? ', ' + tag : ''}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${icons[n][0]}"></path></svg><span>${n}</span><em>${tag}</em></button>`;
   };
-  const size = d.icon ? `<div class="ten"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${iconOf(d)}"></path></svg><span>Shown at 10 mm, the size it prints. Actual size on screen depends on your display.</span></div>` : '';
+  const size = d.icon ? `<div class="ten"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${iconOf(d)}"></path></svg><span>Shown at 14 mm, the size it prints. Actual size on screen depends on your display.</span></div>` : '';
   const none = !list.length ? `<p class="small">No icons match. Try another word or paste your own.</p>` : '';   // FC-S13
   return `<label class="f"><span>Search icons</span><input class="in" id="iconQ" value="${esc(f.query)}"></label>
     <div id="iconResults"><div class="icons">${list.map(btn).join('')}</div>${none}</div>${size}
@@ -417,7 +417,7 @@ const actions = {
     }
   },
   save: () => {
-    const f = S.flow, d = { ...f.draft, id: f.draft.id.trim(), name: f.draft.name.trim(), updated: today(), status: 'built' };
+    const f = S.flow, d = { ...f.draft, id: f.draft.id.trim(), name: f.draft.name.trim(), updated: today(), status: 'built', version: 'v4' };
     const at = S.drawers.findIndex((x) => x.id === (f.editingId ?? d.id));
     if (at >= 0) S.drawers[at] = d; else S.drawers.push(d);
     S.flow = null; S.job = null; changed(); say(`Saved drawer ${d.id}`);

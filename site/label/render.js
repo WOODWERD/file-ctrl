@@ -1,11 +1,11 @@
 // The label as a list of drawing steps, so SVG, PNG, proof and PDF all come from one source (FC-R10).
-// Coordinates are 300 dpi pixels from the top-left of FILE. renderLabel returns SVG sized in mm.
+// Label v4. Coordinates are 300 dpi pixels from the top-left of FILE. renderLabel returns SVG sized in mm.
 import { derive } from './geometry.js';
 import { fitLabel, textArea, advance } from './fit.js';
 
 const BK = '#101010', GY1 = '#4A4A4A', GY2 = '#7C7C7C', GY3 = '#B4B4B4';
-const ICON_MM = 10, ICON_NUDGE = 0.4, ID_AT = 0.6, ID_PT = 4.5, ID_EM = 0.08, NAME_EM = 0.04;
-const DIVIDER_INSET = 2.5, GAP_MM = 1, LINE = 1.22;
+const ICON_MM = 14, ID_AT = 0.6, ID_PT = 5, ID_EM = 0.08, NAME_EM = 0.04;
+const DIVIDER_INSET = 2.5, GAP_MM = 1, LINE = 1.22, NAME_LINE = 1.08;
 
 const inkTop = (font, text, size) => -font.getPath(text, 0, 0, size).getBoundingBox().y1;
 
@@ -31,16 +31,23 @@ export function labelOps(fonts, std, drawer, iconPath) {
   if (iconPath) {
     const s = g.px(ICON_MM);
     const x = Math.round(g.X(0) + (g.px(g.icon) - s) / 2);
-    const y = Math.round(g.Y(0) + (g.px(std.window.h) - s) / 2) + g.px(ICON_NUDGE);
+    const y = Math.round(g.Y(0) + (g.px(std.window.h) - s) / 2);
     ops.push({ t: 'icon', d: iconPath, x, y, scale: s / 24, stroke: BK });
   }
   const nameSize = g.pt(fit.namePt), contentsSize = g.pt(fit.contentsPt);
-  const asc = Math.ceil(fonts.bold.ascender / fonts.bold.unitsPerEm * nameSize) * 0.73;
-  const lh = contentsSize * LINE, gap = g.px(GAP_MM);
-  const { start } = textArea(g);
-  let y = g.Y(0) + (g.px(std.window.h) - (asc + gap + lh * fit.lines.length)) / 2 + asc;
-  ops.push({ t: 'fill', d: tracked(fonts.bold, fit.upper, start, y, nameSize, NAME_EM), fill: BK });
-  y += gap;
+  const cap = fonts.bold.tables.os2.sCapHeight / fonts.bold.unitsPerEm * nameSize;
+  const step = nameSize * NAME_LINE, lh = contentsSize * LINE, gap = g.px(GAP_MM);
+  const { start, width } = textArea(g);
+  const named = fit.nameLines.length;
+  const rule = fit.lines.length ? gap + 2 + gap : 0;
+  let y = g.Y(0) + (g.px(std.window.h) - (cap + (named - 1) * step + rule + lh * fit.lines.length)) / 2 + cap;
+  fit.nameLines.forEach((line, i) => ops.push({ t: 'fill', d: tracked(fonts.bold, line, start, y + i * step, nameSize, NAME_EM), fill: BK }));
+  y += (named - 1) * step;
+  if (fit.lines.length) {
+    y += gap;
+    ops.push({ t: 'rect', x: start, y, w: width, h: 2, fill: GY3 });
+    y += 2 + gap;
+  }
   for (const line of fit.lines) {
     ops.push({ t: 'fill', d: fonts.regular.getPath(line, start, y + inkTop(fonts.regular, line, contentsSize), contentsSize).toPathData(2), fill: GY1 });
     y += lh;

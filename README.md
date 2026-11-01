@@ -51,6 +51,6 @@ No build step. `site/` is what Pages publishes.
 npm test
 ```
 
-`npm test` runs the rule tests, with no dependencies to install. To compare the labels with the v3 goldens, serve the repo root and open `test/golden.html`. `tools/make-icons.py` rewrites `site/icons/tabler.json` from an unpacked `@tabler/icons` package. Bump `VERSION` in `site/sw.js` and the version strings with each release.
+`npm test` runs the rule tests, with no dependencies to install. `tools/make-icons.py` rewrites `site/icons/tabler.json` from an unpacked `@tabler/icons` package. Bump `VERSION` in `site/sw.js` and the version strings with each release.
 
 MIT licence. See `THIRD_PARTY_NOTICES.md` for fonts, icons and libraries.

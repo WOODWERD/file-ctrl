@@ -1,5 +1,5 @@
-// Name fit and contents wrap, as wwlabel.py does them (FC-R06 to FC-R08, FC-R11).
-const NAME_START = 9, NAME_MIN = 6, CONTENTS_START = 4.75, CONTENTS_MIN = 4, STEP = 0.25, NAME_EM = 0.04;
+// Name fit and contents wrap (FC-R06 to FC-R08, FC-R11).
+const NAME_START = 11.5, NAME_MIN = 6, CONTENTS_START = 5.5, CONTENTS_MIN = 4, STEP = 0.25, NAME_EM = 0.04;
 
 export const advance = (font, ch, size) => font.getAdvanceWidth(ch, size, { kerning: false });
 
@@ -26,8 +26,15 @@ export function textArea(geo) {
 export function fitLabel(fonts, geo, name, contents) {
   const { width } = textArea(geo);
   const upper = (name || '').toUpperCase();
+  const fitsAt = (lines, pt) => lines.every((l) => nameWidth(fonts, l, geo.pt(pt)) <= width);
+  let nameLines = [upper];
+  const words = upper.trim().split(/\s+/);
+  if (!fitsAt(nameLines, NAME_START) && words.length > 1) {
+    const half = Math.ceil(words.length / 2);
+    nameLines = [words.slice(0, half).join(' '), words.slice(half).join(' ')];
+  }
   let namePt = NAME_START;
-  while (nameWidth(fonts, upper, geo.pt(namePt)) > width && namePt > NAME_MIN) namePt -= STEP;
+  while (!fitsAt(nameLines, namePt) && namePt > NAME_MIN) namePt -= STEP;
   let contentsPt = CONTENTS_START;
   let lines = contents ? wrap(fonts, contents, geo.pt(contentsPt), width) : [];
   while (lines.length > 2 && contentsPt > CONTENTS_MIN) {
@@ -35,9 +42,8 @@ export function fitLabel(fonts, geo, name, contents) {
     lines = wrap(fonts, contents, geo.pt(contentsPt), width);
   }
   return {
-    upper, namePt, contentsPt, lines,
-    nameOver: nameWidth(fonts, upper, geo.pt(namePt)) > width,
-    fitsAtStart: nameWidth(fonts, upper, geo.pt(NAME_START)) <= width,
+    upper, nameLines, namePt, contentsPt, lines,
+    nameOver: !fitsAt(nameLines, namePt),
     contentsOver: lines.length > 2
   };
 }
