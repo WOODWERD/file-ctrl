@@ -10,6 +10,6 @@
 | pdf-lib | 1.17.1 | MIT | `site/vendor/LICENSE-pdf-lib.txt` |
 | JSZip | 3.10.1 | MIT, chosen from its MIT or GPLv3 dual licence | `site/vendor/LICENSE-jszip.txt` |
 
-The WOODWERD / DESIGN mark is a mark of WOODWERD LLC. The MIT licence on this code doesn't grant rights to use it.
+The WOODWERD / DESIGN mark and the WW button are marks of WOODWERD LLC. The MIT licence on this code doesn't grant rights to use them.
 
 BISLEY, Liene and PixCut are trademarks of their owners. This project is independent of them.
