@@ -32,7 +32,7 @@ export function labelOps(fonts, std, drawer, iconPath) {
     const s = g.px(ICON_MM);
     const x = Math.round(g.X(0) + (g.px(g.icon) - s) / 2);
     const y = Math.round(g.Y(0) + (g.px(std.window.h) - s) / 2);
-    ops.push({ t: 'icon', d: iconPath, x, y, scale: s / 24, stroke: BK });
+    ops.push({ t: 'icon', d: iconPath, x, y, scale: s / 24, fill: BK });
   }
   const nameSize = g.pt(fit.namePt), contentsSize = g.pt(fit.contentsPt);
   const cap = fonts.bold.tables.os2.sCapHeight / fonts.bold.unitsPerEm * nameSize;
@@ -59,7 +59,7 @@ export function opsToSvg(ops) {
   return ops.map((o) => {
     if (o.t === 'rect') return `<rect x="${o.x}" y="${o.y}" width="${o.w}" height="${o.h}" fill="${o.fill}"/>`;
     if (o.t === 'fill') return `<path fill="${o.fill}" d="${o.d}"/>`;
-    return `<path transform="translate(${o.x} ${o.y}) scale(${o.scale})" fill="none" stroke="${o.stroke}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="${o.d}"/>`;
+    return `<path transform="translate(${o.x} ${o.y}) scale(${o.scale})" fill="${o.fill}" fill-rule="evenodd" d="${o.d}"/>`;
   }).join('');
 }
 

@@ -25,8 +25,8 @@ Export CSV or JSON is your real save. Browser storage is only a convenience, and
 | `id` | Required. One row per ID |
 | `name` | Required. No two rows share a name |
 | `contents` | Comma-separated items, 3 to 5 reads best |
-| `icon` | A Tabler outline name, or a `custom-` name. No two rows share an icon |
-| `icon_source` | `tabler` or `custom` |
+| `icon` | An Icon Ctrl key, or a `custom-` name. No two rows share an icon |
+| `icon_source` | `iconctrl` or `custom`. Older files with `tabler` still import, per the guide |
 | `custom_svg` | The SVG for a custom icon |
 | `icon_weak` | `true` flags an icon you'd like to replace |
 | `version` | Label layout version |
@@ -35,7 +35,7 @@ Export CSV or JSON is your real save. Browser storage is only a convenience, and
 
 ## Custom icons
 
-Paste an SVG in Tabler's style: 24 × 24 viewBox, fill none, stroke `currentColor`, stroke-width 2, round caps and joins, artwork within 2 to 22, and no text. The app names anything that doesn't fit, and only shape elements are accepted.
+Paste an SVG in Icon Ctrl's style: 24 × 24 viewBox, fill `currentColor` with `fill-rule="evenodd"`, no stroke, artwork within 1 to 23, and no text. The app names anything that doesn't fit, and only shape elements are accepted.
 
 ## Printing
 
@@ -53,6 +53,6 @@ No build step. `site/` is what Pages publishes.
 npm test
 ```
 
-`npm test` runs the rule tests, with no dependencies to install. `tools/make-icons.py` rewrites `site/icons/tabler.json` from an unpacked `@tabler/icons` package. Bump `VERSION` in `site/sw.js` and the version strings with each release.
+`npm test` runs the rule tests, with no dependencies to install. `site/icons/icons.js` is Icon Ctrl's Print set, copied unchanged from its `dist/print/icons.js`. To update it, copy a newer release over it. Don't edit it by hand. Bump `VERSION` in `site/sw.js` and the version strings with each release, and add a `CHANGELOG.md` entry.
 
 MIT licence. See `THIRD_PARTY_NOTICES.md` for fonts, icons and libraries.

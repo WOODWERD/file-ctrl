@@ -1,7 +1,8 @@
-// Plain-language checks next to the label (FC-K01 to FC-K08). hold blocks save; note doesn't.
+// Plain-language checks next to the label (FC-K01 to FC-K10). hold blocks save; note doesn't.
 import { nameUsedBy, iconUsedBy } from '../registry/uniqueness.js';
 import { derive } from '../label/geometry.js';
 import { fitLabel } from '../label/fit.js';
+import { isOldIcon } from '../icons/legacy.js';
 
 const missing = (fonts, text) => [...new Set([...text].filter((c) => c !== ' ' && fonts.regular.charToGlyph(c).index === 0))];
 
@@ -13,6 +14,7 @@ export function checks(fonts, std, d, drawers, units) {
   if (!d.id) hold('FC-K01', 'Add an ID to save this drawer.');
   if (!d.name) hold('FC-K01', 'Add a name to save this drawer.');
   if (!d.icon && !d.custom_svg) hold('FC-K01', 'Pick an icon to save this drawer.');
+  if (isOldIcon(d)) hold('FC-K10', 'Pick an icon. This one was from the old icon set.');
   if (d.name && f.nameOver) hold('FC-K02', 'This name is too long even at 6 pt. Shorten it.');
   if (d.name && !f.nameOver && f.namePt < 7) note('FC-K03', `Name prints at ${f.namePt} pt. Consider a shorter one.`);
   if (f.contentsOver) note('FC-K04', `Contents run to ${f.lines.length} lines. Trim the list.`);

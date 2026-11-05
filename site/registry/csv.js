@@ -1,3 +1,5 @@
+import { migrate } from '../icons/legacy.js';
+
 // Registry import and export. CSV follows RFC 4180, so custom SVGs keep their line breaks (FC-R24, FC-A16).
 export const COLUMNS = ['id', 'name', 'contents', 'icon', 'icon_source', 'custom_svg', 'icon_weak', 'version', 'status', 'updated'];
 const STATUS = ['built', 'printed', 'installed'];
@@ -32,10 +34,10 @@ export function normalise(o) {
   d.id = String(d.id).trim();
   d.name = String(d.name).trim();
   d.icon_weak = d.icon_weak === true || String(d.icon_weak).toLowerCase() === 'true';
-  d.icon_source = d.icon_source === 'custom' ? 'custom' : 'tabler';
+  d.icon_source = d.icon_source === 'custom' ? 'custom' : String(d.icon_source).toLowerCase() === 'tabler' ? 'tabler' : 'iconctrl';
   if (!STATUS.includes(d.status)) d.status = 'built';
   d.version = d.version || 'v4';
-  return d;
+  return migrate(d);
 }
 
 // Returns rows, or throws with a message saying what to fix

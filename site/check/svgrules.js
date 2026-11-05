@@ -1,4 +1,4 @@
-// Custom icon rules (FC-R53). Reads the SVG as text, so nothing in it can run. Shapes become one path.
+// Custom icon rules (FC-R53), in Icon Ctrl's filled style. Reads the SVG as text, so nothing in it can run. Shapes become one path.
 const SHAPES = ['path', 'circle', 'ellipse', 'line', 'polyline', 'polygon', 'rect'];
 const OK_TAGS = ['svg', 'g', ...SHAPES];
 const NUM = (v) => parseFloat(v) || 0;
@@ -61,18 +61,17 @@ export function checkSvg(text) {
   const rest = others.filter((t) => t !== 'text' && t !== 'tspan');
   if (rest.length) fails.push(`Only shape elements are allowed. Remove ${rest.join(', ')}.`);
   if (/\son[a-z]+\s*=/i.test(src)) fails.push('Remove event attributes such as onclick.');
-  const shapes = tags.filter((t) => SHAPES.includes(t.tag) && !(t.a.stroke === 'none' && (t.a.fill === 'none' || t.a.d === 'M0 0h24v24H0z')));
+  const shapes = tags.filter((t) => SHAPES.includes(t.tag) && t.a.fill !== 'none');
   if (!shapes.length) fails.push('There is nothing to draw in this SVG.');
   const look = (k) => { const own = shapes.map((s) => s.a[k]).find((v) => v !== undefined); return root.a[k] ?? own; };
-  if (root.a.fill !== 'none' || shapes.some((s) => s.a.fill && s.a.fill !== 'none')) fails.push('Use fill none. This one is filled.');
-  if (look('stroke') !== 'currentColor') fails.push('Use stroke currentColor, so the icon prints black.');
-  if (String(look('stroke-width')) !== '2') fails.push('Use stroke-width 2.');
-  if (look('stroke-linecap') !== 'round' || look('stroke-linejoin') !== 'round') fails.push('Use round caps and joins.');
+  if (look('fill') !== 'currentColor' || shapes.some((s) => s.a.fill && s.a.fill !== 'currentColor')) fails.push('Use fill currentColor, so the icon prints black.');
+  if ([root, ...shapes].some((s) => s.a.stroke && s.a.stroke !== 'none')) fails.push('Use no stroke. Draw lines as filled shapes.');
+  if (look('fill-rule') !== 'evenodd') fails.push('Use fill-rule evenodd, so holes stay open.');
   const d = shapes.map((s) => toPath(s.tag, s.a)).join(' ');
   if (d && vb === '0 0 24 24') {
     const b = pathBounds(d);
     if (!b) fails.push("This path can't be read. Check its data.");
-    else if (b.x0 < 2 - 0.01 || b.y0 < 2 - 0.01 || b.x1 > 22 + 0.01 || b.y1 > 22 + 0.01) fails.push('Keep the artwork within 2 to 22.');
+    else if (b.x0 < 1 - 0.01 || b.y0 < 1 - 0.01 || b.x1 > 23 + 0.01 || b.y1 > 23 + 0.01) fails.push('Keep the artwork within 1 to 23.');
   }
   return { ok: fails.length === 0, fails, d };
 }

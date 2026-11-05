@@ -1,23 +1,23 @@
-// The 16 labels in label-registry.md (FC-R22). Generic drawer categories, no home details.
-const row = (id, name, contents, icon, weak) => ({ id, name, contents, icon, icon_source: 'tabler', custom_svg: '', icon_weak: !!weak, version: 'v4', status: 'built', updated: '2026-10-30' });
+// The 16 labels in label-registry.md (FC-R22), with Icon Ctrl icons (FC-R55). Generic drawer categories, no home details.
+const row = (id, name, contents, icon) => ({ id, name, contents, icon, icon_source: 'iconctrl', custom_svg: '', icon_weak: false, version: 'v4', status: 'built', updated: '2026-11-04' });
 
 export const SEED = [
-  row('D1', 'Test', 'Meter, leads, logic analyzer, calipers', 'circuit-voltmeter'),
-  row('D2', 'Rework', 'Hot air nozzles, PCB vise, loupe', 'flame'),
-  row('D3', 'Power', 'USB cables, UART, programmers, PSU leads', 'usb'),
-  row('01', 'Desk', 'Pens, notes, tape, label tape', 'pencil'),
-  row('02', 'Hand tools', 'Strippers, flush cutters, pliers, tweezers', 'tool'),
-  row('03', 'Solder', 'Solder, flux, wick, tips, heat shrink', 'droplet', true),
-  row('04', 'Drivers', 'Bits, spudgers, pry tools, ESD strap', 'tools'),
-  row('05', 'Passives', 'Resistors, capacitors, inductors, pots', 'circuit-resistor'),
-  row('06', 'Semis', 'LEDs, diodes, transistors, ICs, regulators', 'circuit-diode'),
-  row('07', 'Boards', 'ESP32, CYD, sensors, displays, modules', 'cpu'),
-  row('08', 'Connectors', 'Headers, JST, Dupont, terminals', 'plug-connected'),
-  row('09', 'Wire', 'Hookup wire, jumpers, ribbon, silicone', 'route', true),
-  row('10', 'Fasteners', 'M2–M5 screws, standoffs, inserts, magnets', 'hexagon', true),
-  row('F1', 'Proto', 'Breadboards, perfboard, refill stock', 'grid-dots'),
-  row('F2', 'Projects', 'WIP kits, enclosures, LiPo bag', 'box'),
-  row('F3', 'Files', 'Datasheets, manuals, project folders', 'folders')
+  row('D1', 'Test', 'Meter, leads, logic analyzer, calipers', 'multimeter'),
+  row('D2', 'Rework', 'Hot air nozzles, PCB vise, loupe', 'hot-air-station'),
+  row('D3', 'Power', 'USB cables, UART, programmers, PSU leads', 'usb-cable'),
+  row('01', 'Desk', 'Pens, notes, tape, label tape', 'pen'),
+  row('02', 'Hand tools', 'Strippers, flush cutters, pliers, tweezers', 'pliers-cutter'),
+  row('03', 'Solder', 'Solder, flux, wick, tips, heat shrink', 'soldering-iron'),
+  row('04', 'Drivers', 'Bits, spudgers, pry tools, ESD strap', 'screwdriver'),
+  row('05', 'Passives', 'Resistors, capacitors, inductors, pots', 'resistor'),
+  row('06', 'Semis', 'LEDs, diodes, transistors, ICs, regulators', 'chip'),
+  row('07', 'Boards', 'ESP32, CYD, sensors, displays, modules', 'dev-board'),
+  row('08', 'Connectors', 'Headers, JST, Dupont, terminals', 'connector'),
+  row('09', 'Wire', 'Hookup wire, jumpers, ribbon, silicone', 'wire-spool'),
+  row('10', 'Fasteners', 'M2–M5 screws, standoffs, inserts, magnets', 'screw'),
+  row('F1', 'Proto', 'Breadboards, perfboard, refill stock', 'breadboard'),
+  row('F2', 'Projects', 'WIP kits, enclosures, LiPo bag', 'kit'),
+  row('F3', 'Files', 'Datasheets, manuals, project folders', 'folder')
 ];
 
 // Units belong to the seeded registry, not the standard (FC-R17)

@@ -14,6 +14,8 @@ import { checks, blocked } from './check/checks.js';
 import { sheetLayout, sheetPixels, renderSheet, renderPagePreview, PAGES } from './export/sheet.js';
 import { buildPdf } from './export/pdf.js';
 import { svgToCanvas, canvasToPng } from './export/png.js';
+import { ICONS } from './icons/icons.js';
+import { migrate } from './icons/legacy.js';
 
 const $ = (id) => document.getElementById(id);
 const app = $('app');
@@ -21,7 +23,7 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '
 const today = () => new Date().toISOString().slice(0, 10);
 const say = (t) => { $('live').textContent = t; };
 
-let fonts, icons;
+let fonts;
 const S = {
   std: STANDARDS[0], drawers: [], units: true, examples: true, storageOk: true,
   status: 'all', weakOnly: false, picked: new Set(), showLib: false,
@@ -29,7 +31,8 @@ const S = {
   route: 'sheet', upright: false, job: null
 };
 
-const iconOf = (d) => (d.icon_source === 'custom' ? checkSvg(d.custom_svg).d : icons[d.icon]?.[0]) || '';
+const iconOf = (d) => (d.icon_source === 'custom' ? checkSvg(d.custom_svg).d : ICONS[d.icon]?.f) || '';
+const glyph = (path) => `<svg viewBox="0 0 24 24" aria-hidden="true"><path fill-rule="evenodd" d="${path}"></path></svg>`;
 const unitsNow = () => (S.units ? UNITS : []);
 const proof = (d) => renderProof(fonts, S.std, d, iconOf(d));
 const persist = () => {
@@ -124,7 +127,7 @@ function area1() {
 }
 
 /* ---- Label flow (Area 2) ---- */
-const blank = () => ({ id: '', name: '', contents: '', icon: '', icon_source: 'tabler', custom_svg: '', icon_weak: false, version: 'v4', status: 'built', updated: '' });
+const blank = () => ({ id: '', name: '', contents: '', icon: '', icon_source: 'iconctrl', custom_svg: '', icon_weak: false, version: 'v4', status: 'built', updated: '' });
 
 function startFlow(d) {
   S.flow = { step: d ? 2 : 1, isNew: !d, inUse: false, draft: d ? { ...d } : blank(), result: null, query: '', custom: false, svgText: '', svgFails: [] };
@@ -138,12 +141,13 @@ function iconResults(q) {
   const words = q.toLowerCase().split(/[\s,]+/).filter((w) => w.length > 1).map((w) => w.replace(/s$/, ''));
   if (!words.length) return [];
   const hits = [];
-  for (const [name, [, tags]] of Object.entries(icons)) {
+  for (const { key: name, words: tags } of Object.values(ICONS)) {
+    const tagList = tags.split(' ');
     let score = 0;
     for (const w of words) {
       if (name === w) score += 5;
       else if (name.includes(w)) score += 3;
-      else if (tags.includes(w)) score += 1;
+      else if (tagList.some((t) => t.startsWith(w))) score += 1;
     }
     if (score) hits.push([score, name]);
   }
@@ -152,7 +156,7 @@ function iconResults(q) {
 
 function pickIcon(name) {
   const f = S.flow, d = f.draft;
-  d.icon = name; d.icon_source = 'tabler'; d.custom_svg = ''; d.icon_weak = false;
+  d.icon = name; d.icon_source = 'iconctrl'; d.custom_svg = ''; d.icon_weak = false;
 }
 
 const stepRow = (n, title, val, inner, cur) => `<div class="step${n < cur ? ' done' : n === cur ? ' now' : ''}"><span class="dot">${n}</span><div class="sb"><div class="sh"><b>${title}</b><span class="sv">${val}</span></div>${n === cur ? inner : ''}</div></div>`;
@@ -175,15 +179,13 @@ function iconPanel(f) {
     const fails = f.svgFails.length ? `<div class="health bad" role="alert"><b>This SVG doesn't fit the label style</b><span>Fix the ${f.svgFails.length === 1 ? 'item' : f.svgFails.length + ' items'} below and check it again.</span></div><ul class="fails">${f.svgFails.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : '';
     return `<label class="f"><span>Paste SVG</span><textarea class="in m${f.svgFails.length ? ' bad' : ''}" id="svgText" spellcheck="false">${esc(f.svgText)}</textarea></label>${fails}<div class="tools"><button class="key" type="button" data-act="svgcheck">Check this SVG</button><button class="key" type="button" data-act="svgoff">Back to search</button></div>`;
   }
-  const names = iconResults(f.query);
-  const cand = ['custom-soldering-iron', 'nut'];
-  const list = [...names.filter((n) => cand.includes(n)), ...names.filter((n) => !cand.includes(n))];
+  const list = iconResults(f.query);
   const btn = (n) => {
     const u = iconUsedBy(S.drawers, n, self);
-    const tag = u ? `Used by ${u.id}` : n === d.icon ? 'Selected' : cand.includes(n) ? 'Candidate' : '';
-    return `<button class="icb" type="button" data-act="icon" data-v="${n}" ${u ? 'disabled' : ''} aria-pressed="${n === d.icon}" aria-label="${n}${tag ? ', ' + tag : ''}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${icons[n][0]}"></path></svg><span>${n}</span><em>${tag}</em></button>`;
+    const tag = u ? `Used by ${u.id}` : n === d.icon ? 'Selected' : '';
+    return `<button class="icb" type="button" data-act="icon" data-v="${n}" ${u ? 'disabled' : ''} aria-pressed="${n === d.icon}" aria-label="${esc(ICONS[n].name)}${tag ? ', ' + tag : ''}">${glyph(ICONS[n].f)}<span>${n}</span><em>${tag}</em></button>`;
   };
-  const size = d.icon ? `<div class="ten"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${iconOf(d)}"></path></svg><span>Shown at 14 mm, the size it prints. Actual size on screen depends on your display.</span></div>` : '';
+  const size = iconOf(d) ? `<div class="ten">${glyph(iconOf(d))}<span>Shown at 14 mm, the size it prints. Actual size on screen depends on your display.</span></div>` : '';
   const none = !list.length ? `<p class="small">No icons match. Try another word or paste your own.</p>` : '';   // FC-S13
   return `<label class="f"><span>Search icons</span><input class="in" id="iconQ" value="${esc(f.query)}"></label>
     <div id="iconResults"><div class="icons">${list.map(btn).join('')}</div>${none}</div>${size}
@@ -496,7 +498,7 @@ function draw() {
 
 async function start() {
   try {
-    [fonts, icons] = await Promise.all([loadFonts(), fetch('icons/tabler.json').then((r) => r.json())]);
+    fonts = await loadFonts();
   } catch {
     app.innerHTML = `<div class="health bad" role="alert"><b>Couldn't load</b><span>The label fonts or icons didn't load. Reload while online once.</span></div>`;
     return;
@@ -504,7 +506,7 @@ async function start() {
   const { data, ok } = store.load();
   S.storageOk = ok && store.save(data || { probe: true });
   if (data?.drawers) {
-    S.drawers = data.drawers; S.units = data.units !== false; S.examples = !!data.examples; S.std = standardByKey(data.standard);
+    S.drawers = data.examples ? SEED.map((d) => ({ ...d })) : data.drawers.map(migrate); S.units = data.units !== false; S.examples = !!data.examples; S.std = standardByKey(data.standard);
     if (data.route) S.route = data.route;
   } else {
     S.drawers = SEED.map((d) => ({ ...d }));

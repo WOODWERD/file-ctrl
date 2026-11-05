@@ -9,6 +9,8 @@ import { fitLabel, textArea } from '../site/label/fit.js';
 import { renderLabel, renderProof, labelOps } from '../site/label/render.js';
 import { SEED } from '../site/registry/seed.js';
 import { sheetLayout, sheetPixels, sheetCount, pageLayout, PAGES } from '../site/export/sheet.js';
+import { ICONS } from '../site/icons/icons.js';
+import { pathBounds } from '../site/check/svgrules.js';
 
 const buf = (f) => { const b = readFileSync(f); return b.buffer.slice(b.byteOffset, b.byteOffset + b.length); };
 const fonts = parseFonts(buf('site/fonts/InterTight-700.ttf'), buf('site/fonts/InterTight-400.ttf'));
@@ -48,15 +50,19 @@ test('FC-A05 contents shrink to 4 pt, then report overflow', () => {
 });
 
 test('FC-A19 all ink stays inside the window', () => {
-  const icons = JSON.parse(readFileSync('site/icons/tabler.json', 'utf8'));
   const x1 = geo.X(std.window.w), y1 = geo.Y(std.window.h);
+  const inside = (x, y, id) => assert.ok(x <= x1 + 1 && y <= y1 + 1 && x >= geo.X(0) - 1 && y >= geo.Y(0) - 1, id);
   for (const d of SEED) {
-    const { ops } = labelOps(fonts, std, d, icons[d.icon][0]);
-    for (const o of ops) if (o.t === 'fill') for (const m of o.d.matchAll(/(-?[\d.]+) (-?[\d.]+)/g)) {
-      assert.ok(+m[1] <= x1 + 1 && +m[2] <= y1 + 1 && +m[1] >= geo.X(0) - 1 && +m[2] >= geo.Y(0) - 1, d.id);
-    }
-    assert.match(renderProof(fonts, std, d, icons[d.icon][0]), /^<svg/);
-    assert.match(renderLabel(fonts, std, d, icons[d.icon][0]), /width="44mm" height="22mm"/);
+    const f = ICONS[d.icon].f;
+    const { ops } = labelOps(fonts, std, d, f);
+    for (const o of ops) if (o.t === 'fill') for (const m of o.d.matchAll(/(-?[\d.]+) (-?[\d.]+)/g)) inside(+m[1], +m[2], d.id);
+    const ic = ops.find((o) => o.t === 'icon'), b = pathBounds(f);
+    inside(ic.x + b.x0 * ic.scale, ic.y + b.y0 * ic.scale, d.id); inside(ic.x + b.x1 * ic.scale, ic.y + b.y1 * ic.scale, d.id);
+    assert.match(renderProof(fonts, std, d, f), /^<svg/);
+    const svg = renderLabel(fonts, std, d, f);
+    assert.match(svg, /width="44mm" height="22mm"/);
+    assert.match(svg, /fill="#101010" fill-rule="evenodd"/);
+    assert.doesNotMatch(svg, /stroke/);
   }
 });
 

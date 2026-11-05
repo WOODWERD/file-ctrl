@@ -11,8 +11,14 @@ function drawOps(lib, page, ops, ox, oy, pageH) {
   for (const o of ops) {
     if (o.t === 'rect') page.drawRectangle({ x: ox + o.x * k, y: top - (o.y + o.h) * k, width: o.w * k, height: o.h * k, color: hex(lib, o.fill) });
     else if (o.t === 'fill') page.drawSvgPath(o.d, { x: ox, y: top, scale: k, color: hex(lib, o.fill), borderWidth: 0 });
-    else page.drawSvgPath(o.d, { x: ox + o.x * k, y: top - o.y * k, scale: k * o.scale, borderColor: hex(lib, o.stroke), borderWidth: 2, borderLineCap: lib.LineCapStyle.Round });
+    else page.pushOperators(...evenOdd(lib, o.d, { x: ox + o.x * k, y: top - o.y * k, scale: k * o.scale, rotate: lib.degrees(0), color: hex(lib, o.fill), borderWidth: 0 }));
   }
+}
+
+// Icon Ctrl icons have holes, so they fill with the even-odd rule. pdf-lib's drawSvgPath only fills non-zero.
+function evenOdd(lib, d, opts) {
+  const N = lib.PDFOperatorNames;
+  return lib.drawSvgPath(d, opts).map((op) => (op.name === N.FillNonZero ? lib.PDFOperator.of(N.FillEvenOdd) : op));
 }
 
 export async function buildPdf(lib, fonts, std, drawers, iconOf, pageSize) {
