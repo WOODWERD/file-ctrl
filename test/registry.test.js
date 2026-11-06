@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { parseFonts } from '../site/label/fonts.js';
-import { standardByKey } from '../site/label/standards.js';
+import { standardByKey, withSize } from '../site/label/standards.js';
 import { SEED, UNITS } from '../site/registry/seed.js';
 import { toCsv, readRegistry } from '../site/registry/csv.js';
 import { duplicates, iconUsedBy, nameUsedBy } from '../site/registry/uniqueness.js';
@@ -14,7 +14,7 @@ import { ICONS } from '../site/icons/icons.js';
 const buf = (f) => { const b = readFileSync(f); return b.buffer.slice(b.byteOffset, b.byteOffset + b.length); };
 const fonts = parseFonts(buf('site/fonts/InterTight-700.ttf'), buf('site/fonts/InterTight-400.ttf'));
 const std = standardByKey('bisley');
-const row = (o) => ({ id: '11', name: '', contents: '', icon: 'kit', icon_source: 'iconctrl', custom_svg: '', icon_weak: false, version: 'v3', status: 'built', updated: '', ...o });
+const row = (o) => ({ id: '11', name: '', contents: '', icon: 'kit', icon_source: 'iconctrl', custom_svg: '', icon_weak: false, version: 'v3', status: 'built', updated: '', size: '', ...o });
 
 test('FC-A06 and FC-A07 names and icons stay unique', () => {
   assert.equal(nameUsedBy(SEED, 'solder', '11').id, '03');
@@ -81,9 +81,10 @@ test('checks use plain words', () => {
   assert.ok(k({ name: 'Instrumentations' }).includes('FC-K03'));
   assert.ok(k({ id: '12', name: 'Parts' }).includes('FC-K06'));
   assert.ok(!k({ id: '12', name: 'Parts' }, []).includes('FC-K06'));
-  assert.ok(k({ id: 'F1', name: 'Parts' }).includes('FC-K07'));
+  assert.ok(k({ id: 'D1', name: 'Parts' }).includes('FC-K07'));
   assert.ok(k({ name: 'Parts', contents: '10k Ω' }).length >= 0);
-  const notes = SEED.flatMap((d) => checks(fonts, std, d, SEED, UNITS));
+  const notes = SEED.flatMap((d) => checks(fonts, withSize(std, d.size), d, SEED, UNITS));
+  assert.equal(notes.filter((c) => c.id === 'FC-K11').length, 3);
   assert.equal(notes.filter((c) => c.level === 'hold').length, 0);
   assert.equal(notes.length, 6);
 });

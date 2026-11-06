@@ -2,6 +2,13 @@
 
 What changed in each version of [File Ctrl](https://woodwerd.github.io/file-ctrl/), newest first. Versions are x-numbers while File Ctrl is a public beta.
 
+## x0.0.5 · 2026-11-06
+- A second BISLEY card size: File cabinet, 95 × 25 mm, alongside the 47 × 25 MultiDrawer card.
+- File cabinet labels keep the icon and divider in the same place as MultiDrawer labels, and give the extra width to the name and contents.
+- Each drawer now has a card size. Drawers F1 to F3 start as File cabinet, and you can change any drawer's size while editing it.
+- Sheets and PDF pages hold one size at a time: 9 MultiDrawer or 3 File cabinet labels per Liene sheet, and 18 File cabinet labels per Letter page or 20 per A4.
+- The File cabinet window isn't measured yet. Its labels show a note until it is.
+
 ## x0.0.4 · 2026-11-04
 - New icons: filled silhouettes from [Icon Ctrl](https://woodwerd.github.io/icon-ctrl/) replace the Tabler line icons, on screen and on every label, PNG and PDF. The picker searches Icon Ctrl's 135 icons.
 - Each of the 16 starting drawers has an icon of its own, such as a multimeter for Test, a soldering iron for Solder, a wire spool for Wire and a screw for Fasteners. None is flagged weak now.

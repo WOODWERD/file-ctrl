@@ -1,7 +1,7 @@
 // The 16 labels in label-registry.md (FC-R22), with Icon Ctrl icons (FC-R55). Generic drawer categories, no home details.
 const row = (id, name, contents, icon) => ({ id, name, contents, icon, icon_source: 'iconctrl', custom_svg: '', icon_weak: false, version: 'v4', status: 'built', updated: '2026-11-04' });
 
-export const SEED = [
+const ROWS = [
   row('D1', 'Test', 'Meter, leads, logic analyzer, calipers', 'multimeter'),
   row('D2', 'Rework', 'Hot air nozzles, PCB vise, loupe', 'hot-air-station'),
   row('D3', 'Power', 'USB cables, UART, programmers, PSU leads', 'usb-cable'),
@@ -22,7 +22,13 @@ export const SEED = [
 
 // Units belong to the seeded registry, not the standard (FC-R17)
 export const UNITS = [
-  { key: 'multi', name: '10-drawer', test: (id) => /^(0[1-9]|10)$/.test(id), measured: true },
-  { key: 'desk', name: 'Desktop 3-drawer', test: (id) => /^D[1-3]$/.test(id), measured: false },
-  { key: 'file', name: 'File cabinet', test: (id) => /^F[1-3]$/.test(id), measured: false }
+  { key: 'multi', name: '10-drawer', test: (id) => /^(0[1-9]|10)$/.test(id), measured: true, size: 'multidrawer' },
+  { key: 'desk', name: 'Desktop 3-drawer', test: (id) => /^D[1-3]$/.test(id), measured: false, size: 'multidrawer' },
+  { key: 'file', name: 'File cabinet', test: (id) => /^F[1-3]$/.test(id), measured: true, size: 'file' }
 ];
+
+// A drawer's card size, or its unit's when it has none (FC-R20)
+export const sizeKeyFor = (d, units = UNITS) => d.size || units.find((u) => u.test(d.id))?.size || 'multidrawer';
+export const withSizes = (list, units = UNITS) => list.map((d) => ({ ...d, size: sizeKeyFor(d, units) }));
+
+export const SEED = withSizes(ROWS);

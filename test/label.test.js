@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { parseFonts } from '../site/label/fonts.js';
-import { STANDARDS, standardByKey } from '../site/label/standards.js';
+import { STANDARDS, standardByKey, withSize } from '../site/label/standards.js';
 import { derive } from '../site/label/geometry.js';
 import { fitLabel, textArea } from '../site/label/fit.js';
 import { renderLabel, renderProof, labelOps } from '../site/label/render.js';
@@ -86,4 +86,33 @@ test('FC-A24 a second standard is data only', () => {
   assert.deepEqual(g.file, { w: 57, h: 27 });
   assert.equal(sheetLayout(other).perSheet > 0, true);
   assert.equal(STANDARDS.length >= 1, true);
+});
+
+const wide = withSize(standardByKey('bisley'), 'file');
+
+test('FC-A34 File cabinet geometry and layout B', () => {
+  const g = derive(wide);
+  assert.deepEqual(g.file, { w: 92, h: 22 });
+  near(g.icon, 16.04);
+  near(textArea(g).width / 300 * 25.4, 71.8, 0.01);
+  const x1 = g.X(wide.window.w), y1 = g.Y(wide.window.h);
+  for (const d of SEED.filter((x) => x.size === 'file')) {
+    const f = fitLabel(fonts, g, d.name, d.contents);
+    assert.deepEqual([f.namePt, f.nameLines.length, f.lines.length], [11.5, 1, 1], d.id);
+    const { ops } = labelOps(fonts, wide, d, ICONS[d.icon].f);
+    for (const o of ops) if (o.t === 'fill') for (const m of o.d.matchAll(/(-?[\d.]+) (-?[\d.]+)/g)) assert.ok(+m[1] <= x1 + 1 && +m[2] <= y1 + 1, d.id);
+  }
+});
+
+test('FC-A35 F1 to F3 take the File cabinet size', () => {
+  assert.deepEqual(SEED.filter((d) => d.size === 'file').map((d) => d.id), ['F1', 'F2', 'F3']);
+  assert.equal(SEED.filter((d) => d.size === 'multidrawer').length, 13);
+});
+
+test('FC-A36 sizes pack on their own sheets and pages', () => {
+  assert.equal(sheetLayout(wide).perSheet, 3);
+  assert.deepEqual(sheetPixels(wide), { w: 1063, h: 2008 });
+  assert.equal(pageLayout(wide, PAGES.letter).perPage, 18);
+  assert.equal(pageLayout(wide, PAGES.a4).perPage, 20);
+  assert.equal(sheetLayout(standardByKey('bisley')).perSheet, 9);
 });

@@ -1,17 +1,17 @@
 // File Ctrl interface. Three Areas: Drawers, Label, Print (FC-U05). State IDs in comments match the spec.
-import { STANDARDS, standardByKey } from './label/standards.js';
+import { STANDARDS, standardByKey, withSize } from './label/standards.js';
 import { derive } from './label/geometry.js';
 import { fitLabel } from './label/fit.js';
 import { loadFonts } from './label/fonts.js';
 import { renderLabel, renderProof } from './label/render.js';
-import { SEED, UNITS } from './registry/seed.js';
+import { SEED, UNITS, sizeKeyFor, withSizes } from './registry/seed.js';
 import * as store from './registry/store.js';
 import { toCsv, readRegistry } from './registry/csv.js';
 import { duplicates, iconUsedBy } from './registry/uniqueness.js';
 import { nameCheck, items } from './check/namecheck.js';
 import { checkSvg } from './check/svgrules.js';
 import { checks, blocked } from './check/checks.js';
-import { sheetLayout, sheetPixels, renderSheet, renderPagePreview, PAGES } from './export/sheet.js';
+import { sheetLayout, sheetPixels, renderSheet, renderPagePreview, pageLayout, PAGES } from './export/sheet.js';
 import { buildPdf } from './export/pdf.js';
 import { svgToCanvas, canvasToPng } from './export/png.js';
 import { ICONS } from './icons/icons.js';
@@ -34,7 +34,8 @@ const S = {
 const iconOf = (d) => (d.icon_source === 'custom' ? checkSvg(d.custom_svg).d : ICONS[d.icon]?.f) || '';
 const glyph = (path) => `<svg viewBox="0 0 24 24" aria-hidden="true"><path fill-rule="evenodd" d="${path}"></path></svg>`;
 const unitsNow = () => (S.units ? UNITS : []);
-const proof = (d) => renderProof(fonts, S.std, d, iconOf(d));
+const sd = (d) => withSize(S.std, d.size);
+const proof = (d) => renderProof(fonts, sd(d), d, iconOf(d));
 const persist = () => {
   S.storageOk = store.save({ standard: S.std.key, drawers: S.drawers, units: S.units, examples: S.examples, route: S.route });
 };
@@ -44,7 +45,7 @@ const changed = () => { S.examples = false; persist(); };
 function allChecks() {
   let notes = 0, holds = 0;
   for (const d of S.drawers) {
-    const c = checks(fonts, S.std, d, S.drawers, unitsNow());
+    const c = checks(fonts, sd(d), d, S.drawers, unitsNow());
     notes += c.filter((x) => x.level === 'note').length;
     holds += c.filter((x) => x.level === 'hold').length;
   }
@@ -65,7 +66,7 @@ const shown = () => S.drawers.filter((d) => (S.status === 'all' || d.status === 
 
 function card(d) {
   const on = S.picked.has(d.id);
-  return `<div class="card${on ? ' on' : ''}">
+  return `<div class="card${on ? ' on' : ''}${sd(d).size === 'file' ? ' wide' : ''}">
     <button class="open" type="button" data-act="edit" data-id="${esc(d.id)}" aria-label="Edit drawer ${esc(d.id)} ${esc(d.name)}"><span class="lbl">${proof(d)}</span></button>
     <div class="cmeta">
       <input type="checkbox" data-act="pick" data-id="${esc(d.id)}" ${on ? 'checked' : ''} aria-label="Select drawer ${esc(d.id)} to print">
@@ -112,8 +113,7 @@ function area1() {
     <div class="pad">
       <div class="std">
         <label class="f"><span>Cabinet standard</span><select class="in" data-act="standard" aria-label="Cabinet standard">${STANDARDS.map((s) => `<option value="${s.key}"${s === S.std ? ' selected' : ''}>${esc(s.name)}</option>`).join('')}</select></label>
-        <div class="rd"><span>Card</span><b>${S.std.card.w} × ${S.std.card.h} mm</b></div>
-        <div class="rd"><span>Window</span><b>${S.std.window.w} × ${S.std.window.h} mm</b></div>
+        ${S.std.sizes.map((z) => `<div class="rd"><span>${esc(z.name)}</span><b>${z.card.w} × ${z.card.h} · window ${z.window.w} × ${z.window.h}${z.windowMeasured ? '' : ', not measured'}</b></div>`).join('')}
         <div class="tools" style="justify-content:flex-end">
           <label class="key">Import<input class="sr" type="file" accept=".csv,.json" data-act="import"></label>
           <button class="key" type="button" data-act="csv">Export CSV</button>
@@ -127,14 +127,14 @@ function area1() {
 }
 
 /* ---- Label flow (Area 2) ---- */
-const blank = () => ({ id: '', name: '', contents: '', icon: '', icon_source: 'iconctrl', custom_svg: '', icon_weak: false, version: 'v4', status: 'built', updated: '' });
+const blank = () => ({ id: '', name: '', contents: '', icon: '', icon_source: 'iconctrl', custom_svg: '', icon_weak: false, version: 'v4', status: 'built', updated: '', size: '' });
 
 function startFlow(d) {
   S.flow = { step: d ? 2 : 1, isNew: !d, inUse: false, draft: d ? { ...d } : blank(), result: null, query: '', custom: false, svgText: '', svgFails: [] };
   S.showLib = false;
 }
 
-const fitNow = (d) => fitLabel(fonts, derive(S.std), d.name, d.contents);
+const fitNow = (d) => fitLabel(fonts, derive(sd(d)), d.name, d.contents);
 const fits9 = (d) => fitNow(d).namePt >= 9;
 
 function iconResults(q) {
@@ -194,7 +194,7 @@ function iconPanel(f) {
 }
 
 function checkList(d) {
-  const list = checks(fonts, S.std, d, S.drawers, unitsNow());
+  const list = checks(fonts, sd(d), d, S.drawers, unitsNow());
   return list.map((c) => `<div class="health ${c.level === 'hold' ? 'warn' : ''}" role="status"><b>${c.level === 'hold' ? 'Can\'t save yet' : 'Note'}</b><span>${esc(c.text)}</span></div>`).join('');
 }
 
@@ -209,12 +209,12 @@ function previewFig(f) {
 function area2() {
   const f = S.flow;
   if (!f) return `<section class="tier shut"><div class="tier-h"><span class="n">2</span><h2>Label</h2><span class="tier-d">Name a drawer, pick its icon, check the proof</span><span class="tier-s idle">Pick a drawer or start a new one</span></div></section>`;
-  const d = f.draft, cur = f.step, held = blocked(checks(fonts, S.std, d, S.drawers, unitsNow()));
+  const d = f.draft, cur = f.step, held = blocked(checks(fonts, sd(d), d, S.drawers, unitsNow()));
   const n = items(d.contents).length, lines = fitNow(d).lines.length;
   const s1 = f.inUse
     ? `<label class="f"><span>ID</span><input class="in m" id="fId" value="${esc(d.id)}"></label><div class="health warn" role="status"><b>${esc(d.id)} already has a label</b><span>${esc(S.drawers.find((x) => x.id === d.id)?.name)}, shown here. Replacing it keeps the ID and overwrites the rest.</span></div><div class="tools"><button class="key" type="button" data-act="replace">Replace ${esc(d.id)}</button><button class="key" type="button" data-act="otherid">Pick another ID</button></div>`
     : `<label class="f"><span>ID</span><input class="in m" id="fId" value="${esc(d.id)}" placeholder="01"></label><div class="tools"><button class="key" type="button" data-act="idnext" ${d.id ? '' : 'disabled'}>Next</button></div>`;
-  const s2 = `<label class="f"><span>Name</span><input class="in" id="fName" value="${esc(d.name)}"></label><label class="f"><span>Contents</span><input class="in" id="fContents" value="${esc(d.contents)}"></label><div class="tools"><button class="key" type="button" data-act="check" ${d.name ? '' : 'disabled'}>Check the name</button></div>`;
+  const s2 = `<label class="f"><span>Card size</span><select class="in" data-act="size" aria-label="Card size">${S.std.sizes.map((z) => `<option value="${z.key}"${sd(d).size === z.key ? ' selected' : ''}>${esc(z.name)} · ${z.card.w} × ${z.card.h}</option>`).join('')}</select></label><label class="f"><span>Name</span><input class="in" id="fName" value="${esc(d.name)}"></label><label class="f"><span>Contents</span><input class="in" id="fContents" value="${esc(d.contents)}"></label><div class="tools"><button class="key" type="button" data-act="check" ${d.name ? '' : 'disabled'}>Check the name</button></div>`;
   const s4 = `<label class="f"><span>Contents</span><input class="in" id="fContents" value="${esc(d.contents)}"></label><p class="small" id="trimLine">Aim for 3 to 5 items, comma-separated, within 2 lines. This one has ${n} ${n === 1 ? 'item' : 'items'} on ${lines} ${lines === 1 ? 'line' : 'lines'}.</p><div class="tools"><button class="key" type="button" data-act="next">Next</button></div>`;
   const s6 = `<p class="small">The gray is the steel frame. Only the white area shows in the holder.</p><div class="stack" style="gap:5px">${checkList(d)}</div><div class="tools"><button class="key go" type="button" data-act="save" ${held ? 'disabled' : ''}>Save drawer ${esc(d.id)}</button><button class="key" type="button" data-act="back">Back</button>${f.isNew ? '' : '<button class="key danger" type="button" data-act="remove">Remove</button>'}</div>`;
   const rstate = !f.result ? (cur > 2 ? '' : 'Not checked yet') : f.result.kind === 'unknown' ? 'Not checked' : f.result.kind === 'ok' ? 'Name fits the contents' : 'Your call';
@@ -239,9 +239,13 @@ function area2() {
 function queue() {
   const list = S.picked.size ? S.drawers.filter((d) => S.picked.has(d.id)) : S.drawers;
   const ok = [], held = [];
-  for (const d of list) (blocked(checks(fonts, S.std, d, S.drawers, unitsNow())) ? held : ok).push(d);
+  for (const d of list) (blocked(checks(fonts, sd(d), d, S.drawers, unitsNow())) ? held : ok).push(d);
   return { ok, held };
 }
+
+// One group per card size, in the standard's order (FC-R59)
+const bySize = (list) => S.std.sizes.map((z) => ({ std: withSize(S.std, z.key), drawers: list.filter((d) => sd(d).size === z.key) })).filter((g) => g.drawers.length);
+const sheetsFor = (groups) => groups.reduce((n, g) => n + Math.ceil(g.drawers.length / sheetLayout(g.std).perSheet), 0);
 
 const slug = (s) => s.replace(/\b\w/g, (c) => c.toUpperCase()).replace(/[^A-Za-z0-9]/g, '');
 const fileName = (d) => `${S.std.prefix}_Label_${d.id}_${slug(d.name)}.png`;
@@ -249,8 +253,8 @@ const fileName = (d) => `${S.std.prefix}_Label_${d.id}_${slug(d.name)}.png`;
 function area3() {
   if (S.flow) return `<section class="tier shut"><div class="tier-h"><span class="n">3</span><h2>Print</h2><span class="tier-d">Save files for your printer</span><span class="tier-s idle">Save this drawer first</span></div></section>`;
   if (!S.drawers.length) return `<section class="tier shut"><div class="tier-h"><span class="n">3</span><h2>Print</h2><span class="tier-d">Save files for your printer</span><span class="tier-s idle">Nothing to print yet</span></div></section>`;
-  const { ok, held } = queue(), j = S.job, l = sheetLayout(S.std), r = S.route, n = ok.length;
-  const sheets = Math.ceil(n / l.perSheet);
+  const { ok, held } = queue(), j = S.job, r = S.route, n = ok.length, groups = bySize(ok);
+  const sheets = sheetsFor(groups);
   const pdf = r === 'letter' || r === 'a4', page = PAGES[r];
   const seg = (v, t) => `<button type="button" data-act="route" data-v="${v}" aria-pressed="${r === v}">${t}</button>`;
   const save = r === 'sheet' ? `Save ${sheets} ${sheets === 1 ? 'sheet' : 'sheets'}` : r === 'single' ? `Save ${n} ${n === 1 ? 'label' : 'labels'}` : `Save ${page.name} PDF`;
@@ -258,8 +262,8 @@ function area3() {
   const side = r === 'sheet'
     ? `<div class="health warn" role="status"><b>Print one sheet first</b><span>Sheet cutting is new at this size. Check one before a full run.</span></div><div class="setv"><div>W<b>90</b></div><div>H<b>170</b></div><div>X<b>0</b></div><div>Y<b>0</b></div></div><ol class="setl"><li>Import the sheet.</li><li>Lock aspect, then type the sizes above.</li><li>Cutting mode: Separate, not Overall. Border 1.5.</li><li>Don't use AI remove BG.</li></ol>`
     : r === 'single'
-      ? `<div class="tools"><div class="segc" role="group" aria-label="Orientation"><button type="button" data-act="orient" data-v="r" aria-pressed="${!S.upright}">Rotated</button><button type="button" data-act="orient" data-v="u" aria-pressed="${S.upright}">Upright</button></div></div><div class="setv"><div>W<b>${S.upright ? 44 : 22}</b></div><div>H<b>${S.upright ? 22 : 44}</b></div></div><ol class="setl"><li>Import each label as its own image.</li><li>Lock on, then type the size above for every label.</li><li>Cutting mode: Separate, not Overall.</li><li>Keep inside 90 × 170, at least 4 mm between stickers.</li><li>Don't use AI remove BG.</li></ol>`
-      : `<div class="setv"><div>Per page<b>${r === 'letter' ? 36 : 40}</b></div><div>Scale<b>100 %</b></div></div><ol class="setl"><li>Print at 100 %. Turn off Fit to page.</li><li>Check the 50 mm bar with a ruler.</li><li>Print on card, then cut on the marks.</li></ol>`;
+      ? `<div class="tools"><div class="segc" role="group" aria-label="Orientation"><button type="button" data-act="orient" data-v="r" aria-pressed="${!S.upright}">Rotated</button><button type="button" data-act="orient" data-v="u" aria-pressed="${S.upright}">Upright</button></div></div>${(groups.length ? groups : bySize(S.drawers)).map((g) => { const f = derive(g.std).file; return `<div class="setv"><div>${esc(g.std.sizeName)}</div><div>W<b>${S.upright ? f.w : f.h}</b> H<b>${S.upright ? f.h : f.w}</b></div></div>`; }).join('')}<ol class="setl"><li>Import each label as its own image.</li><li>Lock on, then type the size above for every label.</li><li>Cutting mode: Separate, not Overall.</li><li>Keep inside 90 × 170, at least 4 mm between stickers.</li><li>Don't use AI remove BG.</li></ol>`
+      : `<div class="setv">${(groups.length ? groups : bySize(S.drawers)).map((g) => `<div>${esc(g.std.sizeName)} per page<b>${pdf ? pageLayout(g.std, page).perPage : ''}</b></div>`).join('')}<div>Scale<b>100 %</b></div></div><ol class="setl"><li>Print at 100 %. Turn off Fit to page.</li><li>Check the 50 mm bar with a ruler.</li><li>Print on card, then cut on the marks.</li></ol>`;
   const tested = pdf ? 'Works on any printer. Sizes need checking with a ruler.' : 'Tested on the Liene PixCut S1 with the Liene Photo Mac app.';
   const jobUi = j?.busy ? `<div class="stack" role="status" style="gap:5px"><div class="bar"><i style="width:${Math.round(j.at / j.of * 100)}%"></i></div><p class="small mono">Saving ${j.at} of ${j.of}</p></div>`
     : j?.done ? `<div class="health ok" role="status"><b>Saved</b><span>${esc(j.file)}${j.held ? `. ${j.held} held back` : ''}, in your downloads.</span></div><div class="tools"><button class="key" type="button" data-act="markprinted">Mark ${j.ids.length} as printed</button><button class="key" type="button" data-act="notyet">Not yet</button></div>`
@@ -267,10 +271,14 @@ function area3() {
   const heldLine = held.length ? `<div class="health warn" role="status"><b>${held.length} won't print</b><span>${held.map((d) => esc(d.id)).join(', ')} need a fix first. Open each one to see why.</span></div>` : '';
   let pv = '';
   if (r === 'sheet') {
-    for (let i = 0; i < Math.min(sheets, 2); i++) pv += `<figure class="sheet"><div class="pg"><span class="lbl">${renderSheet(fonts, S.std, ok.slice(i * l.perSheet, (i + 1) * l.perSheet), iconOf)}</span></div><figcaption class="small">Sheet ${i + 1} of ${sheets} · ${Math.min(n - i * l.perSheet, l.perSheet)} labels</figcaption></figure>`;
+    let k = 0;
+    for (const g of groups) {
+      const l = sheetLayout(g.std), count = Math.ceil(g.drawers.length / l.perSheet);
+      for (let i = 0; i < count && k < 2; i++, k++) pv += `<figure class="sheet"><div class="pg"><span class="lbl">${renderSheet(fonts, g.std, g.drawers.slice(i * l.perSheet, (i + 1) * l.perSheet), iconOf)}</span></div><figcaption class="small">${esc(g.std.sizeName)} sheet ${i + 1} of ${count} · ${Math.min(g.drawers.length - i * l.perSheet, l.perSheet)} labels</figcaption></figure>`;
+    }
   } else if (r === 'single') {
-    if (ok[0]) pv = `<figure class="sheet"><div class="proof" style="width:233px"><span class="lbl">${renderLabel(fonts, S.std, ok[0], iconOf(ok[0]))}</span></div><figcaption class="small mono">${esc(fileName(ok[0]))}</figcaption></figure>`;
-  } else if (ok.length) pv = `<figure class="sheet"><div class="pdf"><span class="lbl">${renderPagePreview(fonts, S.std, ok, iconOf, page)}</span></div><figcaption class="small">Page 1 · crop marks and scale bar are added to the PDF</figcaption></figure>`;
+    if (ok[0]) pv = `<figure class="sheet"><div class="proof" style="width:233px"><span class="lbl">${renderLabel(fonts, sd(ok[0]), ok[0], iconOf(ok[0]))}</span></div><figcaption class="small mono">${esc(fileName(ok[0]))}</figcaption></figure>`;
+  } else if (ok.length) pv = `<figure class="sheet"><div class="pdf"><span class="lbl">${renderPagePreview(fonts, groups[0].std, groups[0].drawers, iconOf, page)}</span></div><figcaption class="small">Page 1 · crop marks and scale bar are added to the PDF</figcaption></figure>`;
   return `<section class="tier" aria-labelledby="a3">
     <div class="tier-h"><span class="n">3</span><h2 id="a3">Print</h2><span class="tier-d">Save files for your printer</span><span class="tier-s ${state[1]}">${state[0]}</span></div>
     <div class="pad">
@@ -305,35 +313,40 @@ const loadScript = (src) => (scripts[src] ||= new Promise((ok, no) => {
 
 function printTxt(route) {
   const sheet = ['Liene PixCut S1, Mac app', '', 'Whole sheets', '1. Import the sheet.', '2. Lock aspect. Type W 90, H 170, X 0, Y 0.', '3. Cutting mode: Separate, not Overall. Border 1.5.', "4. Don't use AI remove BG.", '', 'Print one sheet before a full run.'];
-  const single = ['Liene PixCut S1, Mac app', '', '1. Import each label as its own image.', `2. Lock on. Type W ${S.upright ? '44 x H 22' : '22 x H 44'} for every label. The app ignores file dpi.`, '3. Cutting mode: Separate, not Overall. It adds 1.5 mm per side.', `4. Each label prints at ${S.std.card.w} x ${S.std.card.h} mm.`, '5. Keep everything inside 90 x 170, at least 4 mm between stickers.', "6. Don't use AI remove BG."];
+  const single = ['Liene PixCut S1, Mac app', '', '1. Import each label as its own image.', '2. Lock on. Type the size for every label. The app ignores file dpi.', ...S.std.sizes.map((z) => `   ${z.name}: W ${S.upright ? `${z.card.w - 3} x H ${z.card.h - 3}` : `${z.card.h - 3} x H ${z.card.w - 3}`}, prints at ${z.card.w} x ${z.card.h} mm`), '3. Cutting mode: Separate, not Overall. It adds 1.5 mm per side.', '4. File names start BISLEY_Label_ and the drawer ID.', '5. Keep everything inside 90 x 170, at least 4 mm between stickers.', "6. Don't use AI remove BG."];
   return (route === 'sheet' ? sheet : single).join('\n') + '\n';
 }
 
 const tick = () => new Promise((r) => setTimeout(r));
 
 async function exportNow() {
-  const { ok, held } = queue(), r = S.route, l = sheetLayout(S.std), g = derive(S.std);
+  const { ok, held } = queue(), r = S.route, groups = bySize(ok);
   S.job = { busy: true, at: 0, of: ok.length };
   draw();
   try {
     let file;
     if (r === 'letter' || r === 'a4') {
       await loadScript('vendor/pdf-lib.min.js');
-      const bytes = await buildPdf(window.PDFLib, fonts, S.std, ok, iconOf, PAGES[r]);
+      const bytes = await buildPdf(window.PDFLib, fonts, groups, iconOf, PAGES[r]);
       file = `${S.std.prefix}_Labels_${PAGES[r].name}.pdf`;
       download(new Blob([bytes], { type: 'application/pdf' }), file);
     } else {
       const out = [];
       if (r === 'sheet') {
-        const p = sheetPixels(S.std), count = Math.ceil(ok.length / l.perSheet);
-        for (let i = 0; i < count; i++) {
-          const c = await svgToCanvas(renderSheet(fonts, S.std, ok.slice(i * l.perSheet, (i + 1) * l.perSheet), iconOf), p.w, p.h);
-          out.push([`${S.std.prefix}_Sheet_${i + 1}-of-${count}.png`, await canvasToPng(c)]);
-          S.job.at = Math.min(ok.length, (i + 1) * l.perSheet); draw(); await tick();
+        let done = 0;
+        for (const g of groups) {
+          const l = sheetLayout(g.std), p = sheetPixels(g.std), count = Math.ceil(g.drawers.length / l.perSheet);
+          for (let i = 0; i < count; i++) {
+            const part = g.drawers.slice(i * l.perSheet, (i + 1) * l.perSheet);
+            const c = await svgToCanvas(renderSheet(fonts, g.std, part, iconOf), p.w, p.h);
+            out.push([`${g.std.prefix}_${g.std.slug}Sheet_${i + 1}-of-${count}.png`, await canvasToPng(c)]);
+            done += part.length; S.job.at = done; draw(); await tick();
+          }
         }
       } else {
         for (const [i, d] of ok.entries()) {
-          const c = await svgToCanvas(renderLabel(fonts, S.std, d, iconOf(d)), g.W, g.H, !S.upright);
+          const g = derive(sd(d));
+          const c = await svgToCanvas(renderLabel(fonts, sd(d), d, iconOf(d)), g.W, g.H, !S.upright);
           out.push([fileName(d), await canvasToPng(c)]);
           S.job.at = i + 1; if (i % 4 === 0) { draw(); await tick(); }
         }
@@ -387,6 +400,7 @@ const actions = {
   showlib: () => { S.showLib = !S.showLib; },
   cancel: () => { S.flow = null; },
   idnext: () => {
+    if (!S.flow.sizeSet) S.flow.draft.size = sizeKeyFor({ id: S.flow.draft.id.trim() }, unitsNow());
     const f = S.flow, id = f.draft.id.trim();
     if (S.drawers.some((x) => x.id === id)) { f.inUse = true; return; }
     f.step = 2; keepFocus('#fName');
@@ -443,7 +457,7 @@ const actions = {
   fresh: () => { S.confirmFresh = true; },
   'fresh-no': () => { S.confirmFresh = false; },
   'fresh-yes': () => { S.drawers = []; S.units = false; S.examples = false; S.confirmFresh = false; S.picked.clear(); S.undo = null; persist(); },
-  'import-yes': () => { S.drawers = S.importing.rows; S.importing = null; S.examples = false; S.picked.clear(); S.units = S.drawers.every((d) => UNITS.some((u) => u.test(d.id))); persist(); },
+  'import-yes': () => { S.units = S.importing.rows.every((d) => UNITS.some((u) => u.test(d.id))); S.drawers = withSizes(S.importing.rows, unitsNow()); S.importing = null; S.examples = false; S.picked.clear(); persist(); },
   'import-no': () => { S.importing = null; },
   dismiss: () => { S.importError = ''; }
 };
@@ -463,6 +477,7 @@ app.addEventListener('change', (e) => {
   if (a === 'pick') { el.checked ? S.picked.add(el.dataset.id) : S.picked.delete(el.dataset.id); S.job = null; draw(); }
   else if (a === 'weak') { S.weakOnly = el.checked; draw(); }
   else if (a === 'weakflag') { S.flow.draft.icon_weak = el.checked; }
+  else if (a === 'size') { S.flow.draft.size = el.value; S.flow.sizeSet = true; $('flowPreview').innerHTML = previewFig(S.flow); }
   else if (a === 'status') { const d = S.drawers.find((x) => x.id === el.dataset.id); d.status = el.value; d.updated = today(); changed(); draw(); }
   else if (a === 'standard') { S.std = standardByKey(el.value); persist(); draw(); }
   else if (a === 'import' && el.files[0]) importFile(el.files[0]);
@@ -506,7 +521,8 @@ async function start() {
   const { data, ok } = store.load();
   S.storageOk = ok && store.save(data || { probe: true });
   if (data?.drawers) {
-    S.drawers = data.examples ? SEED.map((d) => ({ ...d })) : data.drawers.map(migrate); S.units = data.units !== false; S.examples = !!data.examples; S.std = standardByKey(data.standard);
+    S.units = data.units !== false;
+    S.drawers = data.examples ? SEED.map((d) => ({ ...d })) : withSizes(data.drawers.map(migrate), unitsNow()); S.examples = !!data.examples; S.std = standardByKey(data.standard);
     if (data.route) S.route = data.route;
   } else {
     S.drawers = SEED.map((d) => ({ ...d }));

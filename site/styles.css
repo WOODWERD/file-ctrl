@@ -99,6 +99,7 @@ textarea.in{height:89px;padding:8px;resize:vertical}
 .ghead b{font-size:var(--t-micro);font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--ink)}
 .grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:13px}
 .card{display:flex;flex-direction:column;gap:5px;min-width:0;padding:5px;border:1px solid var(--line);border-radius:8px;background:var(--ground)}
+.card.wide{grid-column:span 2}
 .card.on{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
 .card img,.proof img{display:block;width:100%;height:auto;border-radius:3px}
 .cmeta{display:flex;align-items:center;gap:5px;font-size:var(--t-micro);color:var(--soft);min-height:21px}

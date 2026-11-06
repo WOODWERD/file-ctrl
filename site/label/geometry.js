@@ -13,7 +13,7 @@ export function derive(std) {
   const px = (mm) => pyRound(mm / 25.4 * std.dpi);
   const file = { w: std.card.w - 2 * std.border, h: std.card.h - 2 * std.border };
   const off = { x: (file.w - std.window.w) / 2, y: (file.h - std.window.h) / 2 };
-  const icon = std.window.w / (PHI * PHI);
+  const icon = (std.iconWindow ?? std.window.w) / (PHI * PHI);
   return {
     std, px, file, off, icon,
     text: std.window.w - icon,

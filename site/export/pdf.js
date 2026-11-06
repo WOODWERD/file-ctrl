@@ -21,13 +21,15 @@ function evenOdd(lib, d, opts) {
   return lib.drawSvgPath(d, opts).map((op) => (op.name === N.FillNonZero ? lib.PDFOperator.of(N.FillEvenOdd) : op));
 }
 
-export async function buildPdf(lib, fonts, std, drawers, iconOf, pageSize) {
+// groups: [{ std, drawers }], one card size each. Sizes never share a page (FC-R59).
+export async function buildPdf(lib, fonts, groups, iconOf, pageSize) {
   const doc = await lib.PDFDocument.create();
-  doc.setTitle(std.name + ' drawer labels');
+  doc.setTitle(groups[0].std.name + ' drawer labels');
   doc.setCreator('File Ctrl');
-  const l = pageLayout(std, pageSize);
   const w = pageSize.w * PT, h = pageSize.h * PT, ink = lib.rgb(0.063, 0.063, 0.063);
   const line = (p, x1, y1, x2, y2) => p.drawLine({ start: { x: x1 * PT, y: h - y1 * PT }, end: { x: x2 * PT, y: h - y2 * PT }, thickness: 0.35, color: ink });
+  for (const { std, drawers } of groups) {
+  const l = pageLayout(std, pageSize);
   for (let start = 0; start < drawers.length; start += l.perPage) {
     const page = doc.addPage([w, h]);
     const on = drawers.slice(start, start + l.perPage);
@@ -52,6 +54,7 @@ export async function buildPdf(lib, fonts, std, drawers, iconOf, pageSize) {
     line(page, l.x, by - 1, l.x, by + 1);
     line(page, l.x + 50, by - 1, l.x + 50, by + 1);
     page.drawText('50 mm. Print at 100 %.', { x: (l.x + 52) * PT, y: h - (by + 0.9) * PT, size: 6, color: ink });
+  }
   }
   return doc.save();
 }

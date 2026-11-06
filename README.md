@@ -14,7 +14,7 @@ python3 -m http.server 8141 --directory site
 
 ## The BISLEY standard
 
-Card 47 × 25 mm, window 42 × 18 mm. All ink stays inside the window. The size lives in `site/label/standards.js`, so another cabinet standard is data, not code.
+Two card sizes. MultiDrawer: card 47 × 25 mm, window 42 × 18 mm. File cabinet: card 95 × 25 mm, window 90 × 18 mm, not yet measured. All ink stays inside the window, and each drawer has its own card size. The size lives in `site/label/standards.js`, so another cabinet standard is data, not code.
 
 ## The registry
 
@@ -41,7 +41,7 @@ Paste an SVG in Icon Ctrl's style: 24 × 24 viewBox, fill `currentColor` with `f
 
 **Liene PixCut S1, whole sheets.** Up to 9 labels on one PNG. Import the sheet, lock aspect, type W 90, H 170, X 0, Y 0. Cutting mode Separate, not Overall, border 1.5. Don't use AI remove BG. Print one sheet before a full run.
 
-**Liene PixCut S1, singles.** The Mac app ignores file dpi, so type the size for every label: W 22 × H 44 rotated, W 44 × H 22 upright. Separate mode adds 1.5 mm per side, so 22 × 44 prints at 25 × 47. Keep everything inside 90 × 170 with at least 4 mm between stickers.
+**Liene PixCut S1, singles.** The Mac app ignores file dpi, so type the size for every label: W 22 × H 44 rotated, W 44 × H 22 upright for MultiDrawer, and W 22 × H 92 rotated, W 92 × H 22 upright for File cabinet. Separate mode adds 1.5 mm per side, so 22 × 44 prints at 25 × 47. Keep everything inside 90 × 170 with at least 4 mm between stickers.
 
 **Any printer.** Save a Letter or A4 PDF and print at 100 % with Fit to page off. Check the 50 mm bar with a ruler, then cut on the marks.
 

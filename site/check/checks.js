@@ -27,6 +27,7 @@ export function checks(fonts, std, d, drawers, units) {
     if (d.id && !u) note('FC-K06', `ID ${d.id} isn't in 01 to 10, D1 to D3 or F1 to F3.`);
     if (u && !u.measured) note('FC-K07', `${u.name} card size isn't measured yet.`);
   }
+  if (std.windowMeasured === false) note('FC-K11', `${std.sizeName} window isn't measured yet, so text keeps to an assumed ${std.window.w} × ${std.window.h}.`);
   if (d.icon_weak) note('FC-K08', 'This icon is flagged for a better one.');
   const gone = missing(fonts, (d.name || '').toUpperCase() + (d.contents || '') + d.id);
   if (gone.length) note('FC-K09', `The label font has no ${gone.join(' ')}, so it prints as a gap.`);
