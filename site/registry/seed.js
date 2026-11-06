@@ -23,7 +23,7 @@ const ROWS = [
 // Units belong to the seeded registry, not the standard (FC-R17)
 export const UNITS = [
   { key: 'multi', name: '10-drawer', test: (id) => /^(0[1-9]|10)$/.test(id), measured: true, size: 'multidrawer' },
-  { key: 'desk', name: 'Desktop 3-drawer', test: (id) => /^D[1-3]$/.test(id), measured: false, size: 'multidrawer' },
+  { key: 'desk', name: 'Desktop 3-drawer', test: (id) => /^D[1-3]$/.test(id), measured: true, size: 'multidrawer' },
   { key: 'file', name: 'File cabinet', test: (id) => /^F[1-3]$/.test(id), measured: true, size: 'file' }
 ];
 

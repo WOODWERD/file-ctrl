@@ -2,6 +2,10 @@
 
 What changed in each version of [File Ctrl](https://woodwerd.github.io/file-ctrl/), newest first. Versions are x-numbers while File Ctrl is a public beta.
 
+## x0.0.6 · 2026-11-06
+- Desktop 3-drawer labels are confirmed: the holder is the same as the 10-drawer, so drawers D1 to D3 use the MultiDrawer card with no note.
+- File cabinet labels use the whole card. The file cabinet has no holder, just the handle area on the front, so text has about 2 mm more width and 4 mm more height to sit in, and the note about an unmeasured window is gone.
+
 ## x0.0.5 · 2026-11-06
 - A second BISLEY card size: File cabinet, 95 × 25 mm, alongside the 47 × 25 MultiDrawer card.
 - File cabinet labels keep the icon and divider in the same place as MultiDrawer labels, and give the extra width to the name and contents.

@@ -113,7 +113,7 @@ function area1() {
     <div class="pad">
       <div class="std">
         <label class="f"><span>Cabinet standard</span><select class="in" data-act="standard" aria-label="Cabinet standard">${STANDARDS.map((s) => `<option value="${s.key}"${s === S.std ? ' selected' : ''}>${esc(s.name)}</option>`).join('')}</select></label>
-        ${S.std.sizes.map((z) => `<div class="rd"><span>${esc(z.name)}</span><b>${z.card.w} × ${z.card.h} · window ${z.window.w} × ${z.window.h}${z.windowMeasured ? '' : ', not measured'}</b></div>`).join('')}
+        ${S.std.sizes.map((z) => `<div class="rd"><span>${esc(z.name)}</span><b>${z.card.w} × ${z.card.h} · ${z.holder === false ? 'no holder, label uses the whole card' : `window ${z.window.w} × ${z.window.h}`}${z.windowMeasured ? '' : ', not measured'}</b></div>`).join('')}
         <div class="tools" style="justify-content:flex-end">
           <label class="key">Import<input class="sr" type="file" accept=".csv,.json" data-act="import"></label>
           <button class="key" type="button" data-act="csv">Export CSV</button>

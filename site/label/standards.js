@@ -6,11 +6,12 @@ export const STANDARDS = [
     prefix: 'BISLEY',
     border: 1.5,                // the Liene adds this per side in Separate mode
     dpi: 300,
-    // Card sizes (FC-R18). card slides into the holder; window is the opening, and all ink stays inside it.
+    // Card sizes (FC-R18). card is what's cut; window is where ink may go: the holder's opening, or with no holder the whole FILE.
     sizes: [
       { key: 'multidrawer', name: 'MultiDrawer', slug: '', card: { w: 47, h: 25 }, window: { w: 42, h: 18 }, windowMeasured: true },
+      // No holder (Q12): the card sticks on the front in the handle area, so ink uses the whole FILE.
       // Layout B (FC-R19): the icon panel matches the MultiDrawer card, so it's split from that 42 mm window
-      { key: 'file', name: 'File cabinet', slug: 'FileCabinet_', card: { w: 95, h: 25 }, window: { w: 90, h: 18 }, windowMeasured: false, iconWindow: 42 }
+      { key: 'file', name: 'File cabinet', slug: 'FileCabinet_', card: { w: 95, h: 25 }, window: { w: 92, h: 22 }, windowMeasured: true, holder: false, iconWindow: 42 }
     ]
   }
 ];

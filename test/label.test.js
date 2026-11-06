@@ -94,7 +94,7 @@ test('FC-A34 File cabinet geometry and layout B', () => {
   const g = derive(wide);
   assert.deepEqual(g.file, { w: 92, h: 22 });
   near(g.icon, 16.04);
-  near(textArea(g).width / 300 * 25.4, 71.8, 0.01);
+  near(textArea(g).width / 300 * 25.4, 73.83, 0.01);
   const x1 = g.X(wide.window.w), y1 = g.Y(wide.window.h);
   for (const d of SEED.filter((x) => x.size === 'file')) {
     const f = fitLabel(fonts, g, d.name, d.contents);
