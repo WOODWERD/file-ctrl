@@ -928,7 +928,9 @@ addEventListener('keydown', (e) => {
 function led(id, c) { $('led-' + id).className = 'led' + (c ? ' on-' + c : ''); }
 
 function draw() {
-  const had = document.activeElement?.dataset?.act;
+  // Put focus back on the same control, not the first of its kind, and never scroll to it
+  const ae = document.activeElement, had = ae?.dataset?.act, y = scrollY;
+  const pick = had ? `[data-act="${had}"]` + ['id', 'v', 'unit', 'i'].map((k) => (ae.dataset[k] != null ? `[data-${k}="${CSS.escape(ae.dataset[k])}"]` : '')).join('') : '';
   app.innerHTML = `<div class="bench" style="max-width:none">${area1()}${area2()}${area3()}</div>`;
   const { notes, holds } = S.drawers.length ? allChecks() : { notes: 0, holds: 0 };
   led('drawers', S.drawers.length ? 'ok' : '');
@@ -938,7 +940,8 @@ function draw() {
   const g = S.gh, n = g.conn && store.loadSync()?.base ? waiting(store.loadSync().base, record()) : 0;
   led('sync', !g.conn ? '' : g.state === 'synced' || g.state === 'readonly' ? 'ok' : g.state === 'attention' ? 'fault' : 'busy');
   $('sync-word').textContent = !g.conn ? 'Sync off' : { saving: 'Saving', synced: n ? 'Saving' : 'Synced', offline: `Offline · ${n} waiting`, readonly: 'Read only', attention: 'Needs attention' }[g.state] || 'Sync';
-  if (had) app.querySelector(`[data-act="${had}"]`)?.focus();
+  if (pick) app.querySelector(pick)?.focus({ preventScroll: true });
+  if (scrollY !== y) scrollTo(0, y);
 }
 
 async function start() {

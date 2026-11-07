@@ -2,6 +2,9 @@
 
 What changed in each version of [File Ctrl](https://woodwerd.github.io/file-ctrl/), newest first. Versions are x-numbers while File Ctrl is a public beta.
 
+## x0.0.14 · 2026-11-06
+- Ticking or unticking a label, or changing its status, no longer jumps the page back to the top. Focus stays on the control you used.
+
 ## x0.0.13 · 2026-11-06
 - Five more BISLEY finishes in the colour menu: Anthracite Grey, Black, Doulton Blue, BISLEY Orange and Palest Pink. Like Golden Sunflower Yellow, their start colours come from BISLEY product photos and are marked not matched until you pick from a test strip.
 - Anthracite Grey and Black print with white lettering. Doulton Blue, BISLEY Orange and Palest Pink print black.
