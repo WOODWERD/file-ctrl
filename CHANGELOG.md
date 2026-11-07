@@ -2,6 +2,9 @@
 
 What changed in each version of [File Ctrl](https://woodwerd.github.io/file-ctrl/), newest first. Versions are x-numbers while File Ctrl is a public beta.
 
+## x0.0.16 · 2026-11-07
+- Icon Ctrl's Print set moves to x0.0.9: 159 icons. New are a printer, a label printer, a 3D printer and a toner cartridge, electrical and double-sided tape, and machine and self-drilling screws. Every icon your drawers already use is unchanged.
+
 ## x0.0.15 · 2026-11-07
 - Open any step of a label by choosing its number or title, in any order. To change only the icon, choose 5. No more pressing Next through every step. Opening Name check runs the check; opening Icon fills in the search.
 - Closed steps now show what they hold, such as the name, the icon and the contents line count.
