@@ -2,6 +2,9 @@
 
 What changed in each version of [File Ctrl](https://woodwerd.github.io/file-ctrl/), newest first. Versions are x-numbers while File Ctrl is a public beta.
 
+## x0.0.11 · 2026-11-06
+- Icon Ctrl's Print set moves from x0.0.5 to x0.0.7: 151 icons, up from 135. New are helping hands, paper, a notebook, an envelope, sticky notes, a paper clip, a binder, a label roll, an ink bottle, a cardboard box, a filament spool, a battery cell, keys, a wallet, a card and toothpicks. Every icon your drawers already use is unchanged.
+
 ## x0.0.10 · 2026-11-06
 - The first BISLEY finish in the colour menu: Golden Sunflower Yellow. Its start colour comes from a BISLEY product photo, so it's marked not matched until you pick from a test strip.
 
