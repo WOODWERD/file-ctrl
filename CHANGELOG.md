@@ -2,6 +2,10 @@
 
 What changed in each version of [File Ctrl](https://woodwerd.github.io/file-ctrl/), newest first. Versions are x-numbers while File Ctrl is a public beta.
 
+## x0.0.13 · 2026-11-06
+- Five more BISLEY finishes in the colour menu: Anthracite Grey, Black, Doulton Blue, BISLEY Orange and Palest Pink. Like Golden Sunflower Yellow, their start colours come from BISLEY product photos and are marked not matched until you pick from a test strip.
+- Anthracite Grey and Black print with white lettering. Doulton Blue, BISLEY Orange and Palest Pink print black.
+
 ## x0.0.12 · 2026-11-06
 - Coloured labels no longer show a white rim on the Liene. File Ctrl draws them 1 mm bigger than the card, and the print steps set the Liene border to −1, so the cut lands inside the colour. White labels are unchanged.
 - Coloured labels print on their own sheets, with Colour in the file name, and the steps and PRINT.txt give each its border. Coloured singles show their own size to type, such as W 27 × H 97.

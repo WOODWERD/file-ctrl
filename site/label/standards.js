@@ -8,7 +8,14 @@ export const STANDARDS = [
     // known, a start colour, and where it came from. Start colours are estimates until a test strip matches them.
     finishes: [
       // Drew's file cabinet, 2026-11-06. Sampled from the drawer fronts in a BISLEY product photo, so not matched yet.
-      { key: 'golden-sunflower-yellow', name: 'Golden Sunflower Yellow', code: '', ral: '', hex: '#E7AF28', source: 'BISLEY 3-drawer flush front product photo, drawer fronts' }
+      { key: 'golden-sunflower-yellow', name: 'Golden Sunflower Yellow', code: '', ral: '', hex: '#E7AF28', source: 'BISLEY 3-drawer flush front product photo, drawer fronts' },
+      { key: 'anthracite-grey', name: 'Anthracite Grey', code: '', ral: '', hex: '#474B4F', source: 'BISLEY 3-drawer flush front product photo, drawer fronts' },
+      // The Black, Doulton Blue, BISLEY Orange and Palest Pink photos weren't saved to disk, so they're read by eye, Black a little lifted off pure black as the photo shows
+      { key: 'black', name: 'Black', code: '', ral: '', hex: '#1F2022', source: 'BISLEY 3-drawer flush front product photo, read by eye' },
+      // Read by eye from Drew's photo; the site's own colour dot for it samples #6B8F9C, a little lighter than the painted fronts
+      { key: 'doulton-blue', name: 'Doulton Blue', code: '', ral: '', hex: '#628A9C', source: 'BISLEY 3-drawer flush front product photo, read by eye' },
+      { key: 'bisley-orange', name: 'BISLEY Orange', code: '', ral: '', hex: '#EA7535', source: 'BISLEY 3-drawer flush front product photo, read by eye' },
+      { key: 'palest-pink', name: 'Palest Pink', code: '', ral: '', hex: '#E2B9BC', source: 'BISLEY 3-drawer flush front product photo, read by eye' }
     ],
     border: 1.5,                // the Liene adds this per side in Separate mode
     dpi: 300,
