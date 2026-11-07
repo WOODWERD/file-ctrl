@@ -6,7 +6,8 @@ import { loadFonts } from './label/fonts.js';
 import { renderLabel, renderProof } from './label/render.js';
 import { SEED, UNITS, sizeKeyFor, withSizes } from './registry/seed.js';
 import * as store from './registry/store.js';
-import { toCsv, readRegistry } from './registry/csv.js';
+import { toCsv, readRegistry, withUid, newUid } from './registry/csv.js';
+import { planMove, applyMove, slotsFor, slotOrder, unitOf } from './registry/move.js';
 import { duplicates, iconUsedBy } from './registry/uniqueness.js';
 import { nameCheck, items } from './check/namecheck.js';
 import { checkSvg } from './check/svgrules.js';
@@ -29,7 +30,7 @@ let fonts;
 const S = {
   std: STANDARDS[0], drawers: [], units: true, examples: true, storageOk: true,
   status: 'all', weakOnly: false, picked: new Set(), showLib: false,
-  flow: null, importing: null, importError: '', confirmFresh: false, undo: null,
+  flow: null, importing: null, importError: '', confirmFresh: false, undo: null, move: null,
   route: 'sheet', upright: false, job: null,
   // GitHub storage (FC-R71 to FC-R88). conn is saved apart from the registry; the rest lives only while the page is open.
   gh: { conn: null, form: null, canWrite: true, isPrivate: true, state: 'off', error: null, conflict: null, hold: null, choice: null, busy: false, again: false, at: '', note: '' }
@@ -51,8 +52,8 @@ const record = () => toRecord(S.std.key, S.drawers);
 function applyRecord(rec) {
   S.std = standardByKey(rec.standard);
   S.units = rec.drawers.every((d) => UNITS.some((u) => u.test(d.id)));
-  S.drawers = withSizes(rec.drawers.map(migrate), unitsNow());
-  S.examples = false; S.picked.clear(); S.undo = null;
+  S.drawers = withSizes(rec.drawers.map(migrate).map(withUid), unitsNow());
+  S.examples = false; S.picked.clear(); S.undo = null; S.move = null;
   persist();
 }
 const ghClient = () => client(S.gh.conn.repo, S.gh.conn.token);
@@ -139,7 +140,7 @@ function disconnect() {
 }
 
 const shortVal = (v) => (v === true ? 'Yes' : v === false ? 'No' : String(v ?? '').length > 60 ? String(v).slice(0, 57) + '…' : String(v ?? '') || 'blank');
-const FIELD = { name: 'Name', contents: 'Contents', icon: 'Icon', icon_source: 'Icon source', custom_svg: 'Custom icon', icon_weak: 'Weak icon', version: 'Label version', status: 'Status', size: 'Card size' };
+const FIELD = { id: 'Drawer ID', name: 'Name', contents: 'Contents', icon: 'Icon', icon_source: 'Icon source', custom_svg: 'Custom icon', icon_weak: 'Weak icon', version: 'Label version', status: 'Status', size: 'Card size' };
 
 function githubArea() {
   const g = S.gh, link = `<a href="${SETUP_URL}">Set up GitHub</a>`;
@@ -172,7 +173,7 @@ function githubArea() {
       <div class="segc" role="group" aria-label="Keep for ${esc(x.id)} ${esc(FIELD[x.field] || x.field)}"><button type="button" data-act="gh-keep" data-i="${i}" data-v="mine" aria-pressed="${c.keep[i] === 'mine'}">This device: ${esc(shortVal(x.mine))}</button><button type="button" data-act="gh-keep" data-i="${i}" data-v="theirs" aria-pressed="${c.keep[i] === 'theirs'}">GitHub: ${esc(shortVal(x.theirs))}</button></div></div>`).join('')}</div>
       <div class="tools"><button class="key" type="button" data-act="gh-resolve">Keep these and sync</button></div>`;
   }
-  if (g.hold) h += `<div class="health bad" role="alert"><b>Same name or icon on two drawers</b><span>Another device's change and one here now clash. ${esc(g.hold.join(' '))} Change one of them, and it syncs.</span></div>`;
+  if (g.hold) h += `<div class="health bad" role="alert"><b>Same ID, name or icon on two drawers</b><span>Another device's change and one here now clash. ${esc(g.hold.join(' '))} Move or change one of them, and it syncs.</span></div>`;
   return `<div class="gh" id="github">${h}</div>`;
 }
 
@@ -199,13 +200,17 @@ function statusLine() {
 
 const shown = () => S.drawers.filter((d) => (S.status === 'all' || d.status === S.status) && (!S.weakOnly || d.icon_weak));
 
+// The ID is the grip: drag it to another slot, or press it to open Move to (FC-R93, FC-U15)
+const grip = (d) => (readOnly() ? `<span class="id">${esc(d.id)}</span>` : `<button class="id grip" type="button" data-act="grip" data-id="${esc(d.id)}" aria-label="Move drawer ${esc(d.id)} ${esc(d.name)}">${esc(d.id)}</button>`);
+
 function card(d) {
-  const on = S.picked.has(d.id);
-  return `<div class="card${on ? ' on' : ''}${sd(d).size === 'file' ? ' wide' : ''}">
+  if (d.empty) return `<div class="card slot${d.wide ? ' wide' : ''}" data-slot="${esc(d.id)}" data-unit="${d.unit}"><span class="mono">${esc(d.id)}</span><span>empty</span></div>`;
+  const on = S.picked.has(d.id), u = unitOf(d.id, unitsNow());
+  return `<div class="card${on ? ' on' : ''}${sd(d).size === 'file' ? ' wide' : ''}" data-slot="${esc(d.id)}" data-unit="${u ? u.key : ''}">
     <button class="open" type="button" data-act="edit" data-id="${esc(d.id)}" aria-label="Edit drawer ${esc(d.id)} ${esc(d.name)}"><span class="lbl">${proof(d)}</span></button>
     <div class="cmeta">
+      ${grip(d)}
       <input type="checkbox" data-act="pick" data-id="${esc(d.id)}" ${on ? 'checked' : ''} aria-label="Select drawer ${esc(d.id)} to print">
-      <span class="id">${esc(d.id)}</span>
       ${d.icon_weak ? '<span class="wk">Weak icon</span>' : ''}
       <select data-act="status" data-id="${esc(d.id)}" ${readOnly() ? 'disabled' : ''} aria-label="Status of drawer ${esc(d.id)}">${['built', 'printed', 'installed'].map((s) => `<option value="${s}"${d.status === s ? ' selected' : ''}>${s[0].toUpperCase() + s.slice(1)}</option>`).join('')}</select>
     </div>
@@ -214,10 +219,12 @@ function card(d) {
 
 function groups(list) {
   if (!S.units) return [{ name: 'Drawers', note: '', items: list }];
-  const out = UNITS.map((u) => ({ name: u.name, note: u.measured ? '' : "Card size isn't measured yet", items: list.filter((d) => u.test(d.id)) }));
+  // Slot order, with each empty slot as a drop target while dragging (FC-R96, FC-S30)
+  const empty = (u) => u.slots.filter((id) => !S.drawers.some((d) => d.id === id)).map((id) => ({ empty: true, id, unit: u.key, wide: u.size === 'file' }));
+  const out = UNITS.map((u) => ({ name: u.name, unit: u.key, note: u.measured ? '' : "Card size isn't measured yet", items: slotOrder([...list.filter((d) => u.test(d.id)), ...(readOnly() ? [] : empty(u))], u) }));
   const rest = list.filter((d) => !UNITS.some((u) => u.test(d.id)));
   if (rest.length) out.push({ name: 'Other', note: '', items: rest });
-  return out.filter((g) => g.items.length);
+  return out.filter((g) => g.items.some((d) => !d.empty));
 }
 
 function area1() {
@@ -231,7 +238,8 @@ function area1() {
   if (S.importError) body += `<div class="health bad" role="alert"><b>Import refused</b><span>${esc(S.importError)} Your registry hasn't changed.</span></div><div class="tools"><button class="key" type="button" data-act="dismiss">Dismiss</button></div>`;
   if (S.importing) body += `<div class="health warn" role="status"><b>Replace the registry?</b><span>${esc(S.importing.file)} has ${S.importing.rows.length} drawers with no repeated names or icons. It replaces the ${S.drawers.length} here${S.gh.conn ? `, and on GitHub too. GitHub's history keeps the old one` : ''}. Export first if you want to keep them.</span></div><div class="tools"><button class="key" type="button" data-act="import-yes">Replace ${S.drawers.length} with ${S.importing.rows.length}</button><button class="key" type="button" data-act="import-no">Cancel</button></div>`;
   if (S.confirmFresh) body += `<div class="health warn" role="status"><b>Start fresh?</b><span>This clears all ${S.drawers.length} drawers from this browser${S.gh.conn ? `, and from GitHub too. GitHub's history keeps the old registry` : ''}. Export first if you want to keep them.</span></div><div class="tools"><button class="key danger" type="button" data-act="fresh-yes">Clear ${S.drawers.length} drawers</button><button class="key" type="button" data-act="fresh-no">Cancel</button></div>`;
-  if (S.undo) body += `<div class="health" role="status"><b>Removed ${esc(S.undo.d.id)} ${esc(S.undo.d.name)}</b><span></span><button class="key" type="button" data-act="undo">Undo</button></div>`;
+  if (S.undo) body += `<div class="health" role="status"><b>${S.undo.kind === 'move' ? esc(S.undo.text) : `Removed ${esc(S.undo.d.id)} ${esc(S.undo.d.name)}`}</b><span></span><button class="key" type="button" data-act="undo">Undo</button></div>`;   // FC-S29
+  if (S.move?.where === 'lib') body += movePreview();
   if (S.examples && S.drawers.length) body += `<div class="health" role="status"><b>Example drawers</b><span>These ${S.drawers.length} show how labels look. Edit them, or use Start fresh to begin your own list.</span></div>`;
   if (!S.drawers.length) {
     body += `<div class="stack" style="align-items:flex-start;padding-block:34px"><p style="margin:0">No drawers yet. Add the first one or import a registry.</p>${readOnly() ? '' : '<div class="tools"><button class="key go" type="button" data-act="new">New drawer</button><label class="key">Import<input class="sr" type="file" accept=".csv,.json" data-act="import"></label></div>'}</div>`;
@@ -241,7 +249,7 @@ function area1() {
       <span class="sp"></span><button class="key" type="button" data-act="pickall">${list.length && list.every((d) => S.picked.has(d.id)) ? 'Clear selection' : 'Select all to print'}</button>
       ${readOnly() ? '' : '<button class="key go" type="button" data-act="new" style="height:34px;font-size:var(--t-cap)">New drawer</button>'}</div>`;
     if (!list.length) body += `<div class="stack" style="align-items:flex-start;padding-block:34px"><p style="margin:0">Nothing matches these filters.</p><button class="key" type="button" data-act="clearfilter">Clear filters</button></div>`;
-    for (const g of groups(list)) body += `<div class="group"><div class="ghead"><b>${esc(g.name)}</b><span>${g.note}</span></div><div class="grid">${g.items.map(card).join('')}</div></div>`;
+    for (const g of groups(list)) body += `<div class="group" data-unit="${g.unit || ''}"><div class="ghead"><b>${esc(g.name)}</b><span>${g.note}</span></div><div class="grid">${g.items.map(card).join('')}</div></div>`;
   }
   return `<section class="tier" aria-labelledby="a1">
     <div class="tier-h"><span class="n">1</span><h2 id="a1">Drawers</h2><span class="tier-d">Every label made, by cabinet</span><span class="tier-s ${st.cls}">${st.text}</span></div>
@@ -260,6 +268,58 @@ function area1() {
       ${body}
     </div>
   </section>`;
+}
+
+/* ---- Moving a drawer (FC-R89 to FC-R96) ---- */
+function movePlan() {
+  const m = S.move, units = unitsNow(), d = m && S.drawers.find((x) => x.uid === m.uid);
+  if (!d) return null;
+  const u = unitOf(d.id, units), canShift = !!u && u === unitOf(m.to, units);
+  const target = S.drawers.find((x) => x.id === m.to), mode = canShift ? m.mode : 'swap';
+  return { d, target, canShift, mode, changes: planMove(S.drawers, m.uid, m.to, mode, units) };
+}
+
+// FC-S28
+function movePreview() {
+  const p = movePlan();
+  if (!p || !p.changes.length) return '';
+  const name = (uid) => S.drawers.find((x) => x.uid === uid).name, n = p.changes.length;
+  const alt = p.target && p.canShift ? `<button class="key" type="button" data-act="move-mode">${p.mode === 'swap' ? 'Shift instead' : 'Swap instead'}</button>` : '';
+  return `<div class="health warn" role="status"><b>Move ${esc(p.d.id)} ${esc(p.d.name)} to ${esc(S.move.to)}?</b><span>${n} ${n === 1 ? 'label' : 'labels'} to reprint. Each goes back to Built and is selected for printing.</span></div>
+    <ul class="moves">${p.changes.map((c) => `<li><span class="mono">${esc(c.from)}</span> ${esc(name(c.uid))} → <span class="mono">${esc(c.to)}</span></li>`).join('')}</ul>
+    <div class="tools"><button class="key" type="button" data-act="move-yes">Move</button>${alt}<button class="key" type="button" data-act="move-no">Cancel</button></div>`;
+}
+
+// Step 1 when editing: the ID, and Move to (FC-R90)
+function moveCtl(f) {
+  const d = S.drawers.find((x) => x.id === f.editingId);
+  if (!d || readOnly()) return '';
+  if (S.move?.where === 'flow') return movePreview();
+  const moved = S.undo?.kind === 'move' ? `<div class="health ok" role="status"><b>${esc(S.undo.text)}</b><span></span><button class="key" type="button" data-act="undo">Undo</button></div>` : '';   // FC-S29
+  const slots = slotsFor(S.drawers, d.id, unitsNow());
+  if (slots.length) return moved + `<label class="f"><span>Move to</span><select class="in m" id="fMove" data-act="moveto" aria-label="Move drawer ${esc(d.id)} to">${slots.map((x) => `<option value="${esc(x.id)}"${x.id === d.id ? ' selected' : ''}>${esc(x.id)} · ${x.id === d.id ? 'here now' : x.drawer ? esc(x.drawer.name) : 'empty'}</option>`).join('')}</select></label>`;
+  return moved + `<label class="f"><span>Move to</span><input class="in m" id="fMove" value="${esc(f.moveTo || '')}" placeholder="New ID" autocomplete="off"></label><div class="tools"><button class="key" type="button" data-act="moveid">Move</button></div>`;
+}
+
+// Keep an open flow on its drawer after a move or its undo
+function followFlow() {
+  const f = S.flow;
+  if (!f || f.isNew) return;
+  const d = S.drawers.find((x) => x.uid === f.draft.uid);
+  if (d) { f.editingId = d.id; f.draft.id = d.id; f.draft.status = d.status; f.draft.updated = d.updated; }
+}
+
+function doMove() {
+  const p = movePlan();
+  if (!p || !p.changes.length) { S.move = null; return; }
+  const before = { drawers: S.drawers.map((d) => ({ ...d })), picked: [...S.picked] };
+  const keep = new Set(S.drawers.filter((d) => S.picked.has(d.id)).map((d) => d.uid));
+  p.changes.forEach((c) => keep.add(c.uid));
+  S.drawers = applyMove(S.drawers, p.changes, today());
+  S.picked = new Set(S.drawers.filter((d) => keep.has(d.uid)).map((d) => d.id));
+  const n = p.changes.length, text = `Moved ${p.d.id} ${p.d.name} to ${S.move.to} · ${n} ${n === 1 ? 'label' : 'labels'} to reprint`;
+  S.undo = { kind: 'move', before, text };
+  followFlow(); S.move = null; S.job = null; changed(); say(text);
 }
 
 /* ---- Label flow (Area 2) ---- */
@@ -359,7 +419,7 @@ function area2() {
     <div class="tier-h"><span class="n">2</span><h2 id="a2">Label</h2><span class="tier-d">${f.isNew ? (d.id ? 'New drawer ' + esc(d.id) : 'Name a drawer, pick its icon, check the proof') : 'Editing drawer ' + esc(f.editingId)}</span><span class="tier-s ${state[1]}">${state[0]}</span></div>
     <div class="pad"><div class="split">
       <div class="steps">
-        ${stepRow(1, 'Drawer ID', `<span class="mono">${cur > 1 ? esc(d.id) : ''}</span>`, s1, cur)}
+        ${f.isNew ? stepRow(1, 'Drawer ID', `<span class="mono">${cur > 1 ? esc(d.id) : ''}</span>`, s1, cur) : `<div class="step done"><span class="dot">1</span><div class="sb"><div class="sh"><b>Drawer ID</b><span class="sv"><span class="mono">${esc(f.editingId)}</span></span></div>${moveCtl(f)}</div></div>`}
         ${stepRow(2, 'Name and contents', cur > 2 ? esc(d.name) : '', s2, cur)}
         ${stepRow(3, 'Name check', rstate, resultStrip(f), cur)}
         ${stepRow(4, 'Contents trim', cur > 4 ? `${n} items · ${lines} ${lines === 1 ? 'line' : 'lines'}` : '', s4, cur)}
@@ -531,10 +591,19 @@ const actions = {
   new: () => { startFlow(null); keepFocus('#fId'); },
   edit: (el) => {
     const d = S.drawers.find((x) => x.id === el.dataset.id);
-    startFlow(d); S.flow.editingId = d.id; keepFocus('#fName');
+    startFlow(d); S.flow.editingId = d.id; S.move = null; keepFocus('#fName');
   },
+  grip: (el) => { const d = S.drawers.find((x) => x.id === el.dataset.id); startFlow(d); S.flow.editingId = d.id; S.move = null; keepFocus('#fMove'); },
+  moveid: () => {
+    const f = S.flow, to = (f.moveTo || '').trim();
+    if (to && to !== f.editingId) S.move = { uid: f.draft.uid, to, mode: 'shift', where: 'flow' };
+    keepFocus('[data-act=move-yes]');
+  },
+  'move-yes': () => doMove(),
+  'move-mode': () => { S.move.mode = S.move.mode === 'swap' ? 'shift' : 'swap'; },
+  'move-no': () => { const back = S.move?.where === 'flow'; S.move = null; if (back) keepFocus('#fMove'); },
   showlib: () => { S.showLib = !S.showLib; },
-  cancel: () => { S.flow = null; },
+  cancel: () => { S.flow = null; S.move = null; },
   idnext: () => {
     if (!S.flow.sizeSet) S.flow.draft.size = sizeKeyFor({ id: S.flow.draft.id.trim() }, unitsNow());
     const f = S.flow, id = f.draft.id.trim();
@@ -569,17 +638,21 @@ const actions = {
     }
   },
   save: () => {
-    const f = S.flow, d = { ...f.draft, id: f.draft.id.trim(), name: f.draft.name.trim(), updated: today(), status: 'built', version: 'v4' };
+    const f = S.flow, d = { ...f.draft, uid: f.draft.uid || newUid(), id: f.draft.id.trim(), name: f.draft.name.trim(), updated: today(), status: 'built', version: 'v4' };
     const at = S.drawers.findIndex((x) => x.id === (f.editingId ?? d.id));
     if (at >= 0) S.drawers[at] = d; else S.drawers.push(d);
     S.flow = null; S.job = null; changed(); say(`Saved drawer ${d.id}`);
   },
   remove: () => {
     const f = S.flow, at = S.drawers.findIndex((x) => x.id === f.editingId);
-    S.undo = { d: S.drawers[at], at };
+    S.undo = { kind: 'remove', d: S.drawers[at], at };
     S.drawers.splice(at, 1); S.picked.delete(f.editingId); S.flow = null; changed();
   },
-  undo: () => { S.drawers.splice(S.undo.at, 0, S.undo.d); S.undo = null; changed(); },
+  undo: () => {
+    const u = S.undo;
+    if (u.kind === 'move') { S.drawers = u.before.drawers; S.picked = new Set(u.before.picked); followFlow(); } else S.drawers.splice(u.at, 0, u.d);
+    S.undo = null; changed();
+  },
   filter: (el) => { S.status = el.dataset.v; },
   clearfilter: () => { S.status = 'all'; S.weakOnly = false; },
   pickall: () => { const list = shown(); const all = list.every((d) => S.picked.has(d.id)); list.forEach((d) => (all ? S.picked.delete(d.id) : S.picked.add(d.id))); S.job = null; },
@@ -612,13 +685,14 @@ const actions = {
   }
 };
 // FC-R83: a look-only device can't change the registry
-const EDITS = new Set(['new', 'edit', 'save', 'remove', 'undo', 'fresh', 'fresh-yes', 'import-yes', 'markprinted']);
+const EDITS = new Set(['new', 'edit', 'save', 'remove', 'undo', 'fresh', 'fresh-yes', 'import-yes', 'markprinted', 'grip', 'moveid', 'move-yes', 'move-mode']);
 
 app.addEventListener('click', (e) => {
   const el = e.target.closest('button[data-act]');
   if (!el || el.disabled) return;
   const act = actions[el.dataset.act];
   if (!act || (readOnly() && EDITS.has(el.dataset.act))) return;
+  if (el.dataset.act === 'grip' && dragged) { dragged = false; return; }
   S.undo = el.dataset.act === 'undo' || el.dataset.act === 'remove' ? S.undo : null;
   const r = act(el);
   if (!(r instanceof Promise)) draw();
@@ -631,6 +705,7 @@ app.addEventListener('change', (e) => {
   else if (a === 'weakflag') { S.flow.draft.icon_weak = el.checked; }
   else if (a === 'size') { S.flow.draft.size = el.value; S.flow.sizeSet = true; $('flowPreview').innerHTML = previewFig(S.flow); }
   else if (a === 'status' && !readOnly()) { const d = S.drawers.find((x) => x.id === el.dataset.id); d.status = el.value; d.updated = today(); changed(); draw(); }
+  else if (a === 'moveto' && !readOnly() && el.value !== S.flow.editingId) { S.move = { uid: S.flow.draft.uid, to: el.value, mode: 'shift', where: 'flow' }; draw(); keepFocus('[data-act=move-yes]'); }
   else if (a === 'standard') { S.std = standardByKey(el.value); persist(); syncSoon(); draw(); }
   else if (a === 'import' && el.files[0]) importFile(el.files[0]);
 });
@@ -643,6 +718,7 @@ app.addEventListener('input', (e) => {
     f.draft[k] = el.value;
     $('flowPreview').innerHTML = previewFig(f);
   };
+  if (el.id === 'fMove') { f.moveTo = el.value; return; }
   if (el.id === 'fId') { f.draft.id = el.value; const b = app.querySelector('[data-act=idnext]'); if (b) b.disabled = !el.value.trim(); }
   else if (el.id === 'fName') { set('name'); f.result = null; const b = app.querySelector('[data-act=check]'); if (b) b.disabled = !el.value.trim(); }
   else if (el.id === 'fContents') {
@@ -650,6 +726,48 @@ app.addEventListener('input', (e) => {
     const t = $('trimLine'); if (t) { const n = items(f.draft.contents).length, l = fitNow(f.draft).lines.length; t.textContent = `Aim for 3 to 5 items, comma-separated, within 2 lines. This one has ${n} ${n === 1 ? 'item' : 'items'} on ${l} ${l === 1 ? 'line' : 'lines'}.`; }
   } else if (el.id === 'iconQ') { f.query = el.value; clearTimeout(f.t); f.t = setTimeout(() => { draw(); keepFocus('#iconQ'); }, 200); }
   else if (el.id === 'svgText') { f.svgText = el.value; }
+});
+
+// Dragging a drawer by its ID (FC-R93, FC-S30). Pointer events, so a mouse and a finger work alike.
+let drag = null, dragged = false;
+function endDrag() {
+  if (!drag) return;
+  app.querySelectorAll('.dragging, .lifted, .drop').forEach((x) => x.classList.remove('dragging', 'lifted', 'drop'));
+  drag = null;
+}
+app.addEventListener('pointerdown', (e) => {
+  const g = e.target.closest('[data-act=grip]');
+  if (!g || readOnly() || e.button > 0) return;
+  const c = g.closest('.card'), d = S.drawers.find((x) => x.id === g.dataset.id);
+  drag = { uid: d.uid, id: d.id, unit: c.dataset.unit, card: c, x: e.clientX, y: e.clientY, on: false, over: null };
+  dragged = false;
+  g.setPointerCapture(e.pointerId);
+});
+app.addEventListener('pointermove', (e) => {
+  if (!drag || drag.cancel) return;
+  if (!drag.on) {
+    if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < 6) return;
+    drag.on = true; drag.card.classList.add('lifted'); drag.card.closest('.group').classList.add('dragging');
+  }
+  const t = document.elementFromPoint(e.clientX, e.clientY)?.closest('[data-slot]');
+  const ok = t && t.dataset.unit === drag.unit && t.dataset.slot !== drag.id && t.closest('.group') === drag.card.closest('.group');
+  app.querySelectorAll('.drop').forEach((x) => x.classList.remove('drop'));
+  if (ok) t.classList.add('drop');
+  drag.over = ok ? t.dataset.slot : null;
+});
+app.addEventListener('pointerup', () => {
+  if (!drag) return;
+  const { on, over, uid, cancel } = drag;
+  endDrag();
+  if (!on && !cancel) return;   // a press, not a drag: the click opens Move to
+  dragged = true; setTimeout(() => { dragged = false; });   // only swallows the click this drag makes
+  if (over && !cancel) { S.undo = null; S.move = { uid, to: over, mode: 'shift', where: 'lib' }; draw(); keepFocus('[data-act=move-yes]'); }
+});
+app.addEventListener('pointercancel', endDrag);
+addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  if (drag) { app.querySelectorAll('.dragging, .lifted, .drop').forEach((x) => x.classList.remove('dragging', 'lifted', 'drop')); drag.cancel = true; drag.on = false; }
+  else if (S.move) { S.move = null; draw(); }
 });
 
 function led(id, c) { $('led-' + id).className = 'led' + (c ? ' on-' + c : ''); }
@@ -679,7 +797,7 @@ async function start() {
   S.storageOk = ok && store.save(data || { probe: true });
   if (data?.drawers) {
     S.units = data.units !== false;
-    S.drawers = data.examples ? SEED.map((d) => ({ ...d })) : withSizes(data.drawers.map(migrate), unitsNow()); S.examples = !!data.examples; S.std = standardByKey(data.standard);
+    S.drawers = data.examples ? SEED.map((d) => ({ ...d })) : withSizes(data.drawers.map(migrate).map(withUid), unitsNow()); S.examples = !!data.examples; S.std = standardByKey(data.standard);
     if (data.route) S.route = data.route;
   } else {
     S.drawers = SEED.map((d) => ({ ...d }));

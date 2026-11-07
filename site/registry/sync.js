@@ -3,19 +3,20 @@ import { normalise } from './csv.js';
 import { duplicates } from './uniqueness.js';
 import { README_PATH, readme } from './github.js';
 
-const FIELDS = ['name', 'contents', 'icon', 'icon_source', 'custom_svg', 'icon_weak', 'version', 'status', 'updated', 'size'];
+const FIELDS = ['id', 'name', 'contents', 'icon', 'icon_source', 'custom_svg', 'icon_weak', 'version', 'status', 'updated', 'size'];
 const canon = (rec) => JSON.stringify({ standard: rec.standard, drawers: rec.drawers.map(normalise) });
 export const same = (a, b) => canon(a) === canon(b);
 const rowSame = (a, b) => (!a && !b) || (!!a && !!b && JSON.stringify(normalise(a)) === JSON.stringify(normalise(b)));
-const byId = (rec) => new Map((rec?.drawers || []).map((d) => [d.id, normalise(d)]));
+// Drawers are matched by uid, so an edit follows a drawer whose ID changed (FC-R97)
+const byUid = (rec) => new Map((rec?.drawers || []).map((d) => normalise(d)).map((d) => [d.uid, d]));
 
 // Three-way merge, drawer by drawer and field by field (FC-R79). A drawer removed on one side and changed on the other is kept.
 export function mergeRecords(base, local, remote) {
-  const B = byId(base), L = byId(local), R = byId(remote), conflicts = [];
-  const ids = [...R.keys(), ...[...L.keys()].filter((id) => !R.has(id))];
+  const B = byUid(base), L = byUid(local), R = byUid(remote), conflicts = [];
+  const keys = [...R.keys(), ...[...L.keys()].filter((k) => !R.has(k))];
   const drawers = [];
-  for (const id of ids) {
-    const b = B.get(id), l = L.get(id), r = R.get(id);
+  for (const uid of keys) {
+    const b = B.get(uid), l = L.get(uid), r = R.get(uid);
     if (rowSame(l, b)) { if (r) drawers.push(r); continue; }
     if (rowSame(r, b)) { if (l) drawers.push(l); continue; }
     if (!l || !r) { drawers.push(l || r); continue; }
@@ -25,7 +26,7 @@ export function mergeRecords(base, local, remote) {
       if (lv === rv || lv === bv) continue;
       if (rv === bv) { d[f] = lv; continue; }
       if (f === 'updated') { d[f] = lv > rv ? lv : rv; continue; } // a date, so the later one
-      conflicts.push({ id, field: f, mine: lv, theirs: rv });
+      conflicts.push({ uid, id: r.id, field: f, mine: lv, theirs: rv });
     }
     drawers.push(d);
   }
@@ -37,25 +38,36 @@ export function mergeRecords(base, local, remote) {
 // Apply the person's choices: keep[i] is 'mine' or 'theirs' for conflicts[i]
 export function resolve(merged, conflicts, keep) {
   const drawers = merged.drawers.map((d) => ({ ...d }));
-  conflicts.forEach((c, i) => { if (keep[i] === 'mine') drawers.find((d) => d.id === c.id)[c.field] = c.mine; });
+  conflicts.forEach((c, i) => { if (keep[i] === 'mine') drawers.find((d) => d.uid === c.uid)[c.field] = c.mine; });
   return { ...merged, drawers };
+}
+
+// "07 Boards moved to 03, 4 renumbered" or "03 Solder and 07 Boards swapped" (FC-R99)
+function movePart(moved) {
+  if (!moved.length) return '';
+  const tag = ([o, d]) => `${o.id} ${d.name}`;
+  if (moved.length === 2 && moved[0][0].id === moved[1][1].id && moved[1][0].id === moved[0][1].id) return `${moved.map(tag).sort().join(' and ')} swapped`;
+  const jump = ([o, d]) => Math.abs((parseInt(o.id.replace(/\D/g, ''), 10) || 0) - (parseInt(d.id.replace(/\D/g, ''), 10) || 0));
+  const main = moved.reduce((a, b) => (jump(b) > jump(a) ? b : a));
+  return `${tag(main)} moved to ${main[1].id}` + (moved.length > 1 ? `, ${moved.length - 1} renumbered` : '');
 }
 
 // "File Ctrl: 05 PASSIVES changed, 2 marked printed" (FC-R78)
 export function commitMessage(before, after) {
-  const B = byId(before), A = byId(after), tag = (d) => `${d.id} ${d.name}`;
-  const added = [...A.values()].filter((d) => !B.has(d.id));
-  const removed = [...B.values()].filter((d) => !A.has(d.id));
-  const changed = [], printed = [];
+  const B = byUid(before), A = byUid(after), tag = (d) => `${d.id} ${d.name}`;
+  const added = [...A.values()].filter((d) => !B.has(d.uid));
+  const removed = [...B.values()].filter((d) => !A.has(d.uid));
+  const changed = [], printed = [], moved = [];
   for (const d of A.values()) {
-    const o = B.get(d.id);
+    const o = B.get(d.uid);
     if (!o || rowSame(o, d)) continue;
+    if (o.id !== d.id && FIELDS.every((f) => ['id', 'status', 'updated'].includes(f) || o[f] === d[f])) { moved.push([o, d]); continue; }
     const onlyStatus = FIELDS.every((f) => f === 'status' || f === 'updated' || o[f] === d[f]);
     if (onlyStatus && d.status !== o.status) printed.push(d); else changed.push(d);
   }
   const part = (list, word) => (!list.length ? '' : list.length <= 2 ? `${list.map(tag).join(', ')} ${word}` : `${list.length} drawers ${word}`);
   const statusPart = !printed.length ? '' : printed.every((d) => d.status === printed[0].status) ? `${printed.length} marked ${printed[0].status}` : `${printed.length} status changes`;
-  const parts = [part(added, 'added'), part(changed, 'changed'), part(removed, 'removed'), statusPart].filter(Boolean);
+  const parts = [movePart(moved), part(added, 'added'), part(changed, 'changed'), part(removed, 'removed'), statusPart].filter(Boolean);
   if (!parts.length && before?.standard !== after.standard) parts.push(`cabinet standard ${after.standard}`);
   return 'File Ctrl: ' + (parts.join(', ') || 'saved');
 }
@@ -63,9 +75,9 @@ export function commitMessage(before, after) {
 // Changes on this device that GitHub doesn't have yet (FC-U13)
 export function waiting(base, local) {
   if (!base) return 0;
-  const B = byId(base), L = byId(local);
+  const B = byUid(base), L = byUid(local);
   let n = 0;
-  for (const id of new Set([...B.keys(), ...L.keys()])) if (!rowSame(B.get(id), L.get(id))) n++;
+  for (const k of new Set([...B.keys(), ...L.keys()])) if (!rowSame(B.get(k), L.get(k))) n++;
   return n + (base.standard !== local.standard ? 1 : 0);
 }
 

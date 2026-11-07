@@ -2,6 +2,12 @@
 
 What changed in each version of [File Ctrl](https://woodwerd.github.io/file-ctrl/), newest first. Versions are x-numbers while File Ctrl is a public beta.
 
+## x0.0.8 · 2026-11-06
+- Move a drawer to another slot. Drag its ID in the library, or open the drawer and choose Move to. The drawers in between shift one slot, or choose Swap instead to trade two.
+- Before anything changes, File Ctrl lists every drawer number that will change. Each drawer with a new number goes back to Built and is selected, ready to reprint. Undo puts it all back.
+- Each drawer now carries a hidden key, so GitHub sync follows a drawer when it moves. An edit made on another device lands on the right drawer.
+- The guide has a new Moving a drawer section.
+
 ## x0.0.7 · 2026-11-06
 - GitHub storage. Connect File Ctrl to a private GitHub repo of your own, under Drawers, and the registry syncs between your devices as one file, `file-ctrl.json`, with a commit for every change. It's optional; without it nothing changes.
 - A Sync light in the header says Synced, Saving, Offline with how many changes are waiting, Read only, or Needs attention.

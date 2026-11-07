@@ -1,8 +1,12 @@
 import { migrate } from '../icons/legacy.js';
 
 // Registry import and export. CSV follows RFC 4180, so custom SVGs keep their line breaks (FC-R24, FC-A16).
-export const COLUMNS = ['id', 'name', 'contents', 'icon', 'icon_source', 'custom_svg', 'icon_weak', 'version', 'status', 'updated', 'size'];
+export const COLUMNS = ['id', 'name', 'contents', 'icon', 'icon_source', 'custom_svg', 'icon_weak', 'version', 'status', 'updated', 'size', 'uid'];
 const STATUS = ['built', 'printed', 'installed'];
+
+// A drawer's hidden key, so sync can follow it when its ID changes (FC-R97). Older registries get d- plus the ID, so every device agrees.
+export const withUid = (d) => (d.uid ? d : { ...d, uid: 'd-' + String(d.id ?? '').trim() });
+export const newUid = () => 'u-' + (globalThis.crypto?.randomUUID?.() || Date.now().toString(36) + Math.random().toString(36).slice(2));
 
 export function parseCsv(text) {
   const rows = []; let row = [], f = '', q = false;
@@ -37,6 +41,7 @@ export function normalise(o) {
   d.icon_source = d.icon_source === 'custom' ? 'custom' : String(d.icon_source).toLowerCase() === 'tabler' ? 'tabler' : 'iconctrl';
   if (!STATUS.includes(d.status)) d.status = 'built';
   d.version = d.version || 'v4';
+  d.uid = String(d.uid).trim() || 'd-' + d.id;
   return migrate(d);
 }
 

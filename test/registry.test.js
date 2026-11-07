@@ -68,7 +68,7 @@ test('FC-A12 custom SVG rules', () => {
 });
 
 test('FC-A16 registry round trips through CSV and JSON', () => {
-  const list = [...SEED, row({ name: 'Iron "hot", 40W', contents: 'Tips, stand', icon: 'custom-x', icon_source: 'custom', custom_svg: '<svg\n viewBox="0 0 24 24"></svg>', icon_weak: true })];
+  const list = [...SEED, row({ uid: 'd-11',  name: 'Iron "hot", 40W', contents: 'Tips, stand', icon: 'custom-x', icon_source: 'custom', custom_svg: '<svg\n viewBox="0 0 24 24"></svg>', icon_weak: true })];
   assert.deepEqual(readRegistry(toCsv(list), 'r.csv'), list);
   assert.deepEqual(readRegistry(JSON.stringify({ drawers: list }), 'r.json'), list);
   assert.throws(() => readRegistry('name,icon\na,b\n', 'x.csv'), /no id column/);

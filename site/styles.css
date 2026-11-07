@@ -219,3 +219,14 @@ a.led{text-decoration:none}
 .cf{display:flex;flex-direction:column;gap:5px}
 .cf .segc{flex-wrap:wrap}
 .cf .segc button{white-space:normal;text-align:left;height:auto;min-height:34px}
+
+/* Moving drawers (FC-R89 to FC-R96, FC-U15) */
+.cmeta .grip{font:500 var(--t-micro) "JetBrains Mono",monospace;color:var(--ink);background:transparent;border:1px solid var(--strong);border-radius:5px;min-width:28px;height:21px;padding:0 5px;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none}
+.cmeta .grip:active{cursor:grabbing}
+.card.slot{display:none;align-items:center;justify-content:center;gap:5px;min-height:60px;border-style:dashed;font-size:var(--t-micro);color:var(--soft);background:transparent}
+.group.dragging .card.slot{display:flex}
+.group.dragging .card{transition:outline-color .1s}
+.card.lifted{opacity:.45}
+.card.drop{outline:2px solid var(--accent);outline-offset:1px}
+ul.moves{margin:0;padding:0 0 0 18px;font-size:var(--t-cap);display:flex;flex-direction:column;gap:3px}
+@media (max-width:640px){.cmeta .grip{min-width:34px;height:34px}}

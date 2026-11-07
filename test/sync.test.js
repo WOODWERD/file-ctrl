@@ -132,7 +132,7 @@ test('FC-R79 a drawer removed on one device and changed on the other is kept', (
   const m = mergeRecords(base, local, remote);
   assert.equal(m.conflicts.length, 0);
   assert.equal(m.record.drawers.find((d) => d.id === '05').contents, 'More');
-  const added = { ...base, drawers: [...base.drawers, { ...base.drawers[0], id: '11', name: 'NEW', icon: 'nut' }] };
+  const added = { ...base, drawers: [...base.drawers, { ...base.drawers[0], uid: 'u-new', id: '11', name: 'NEW', icon: 'nut' }] };
   assert.equal(mergeRecords(base, added, base).record.drawers.at(-1).id, '11');
   assert.equal(waiting(base, added), 1);
 });
