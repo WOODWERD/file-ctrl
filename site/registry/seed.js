@@ -1,5 +1,5 @@
 // The 16 labels in label-registry.md (FC-R22), with Icon Ctrl icons (FC-R55). Generic drawer categories, no home details.
-const row = (id, name, contents, icon) => ({ uid: 'd-' + id, id, name, contents, icon, icon_source: 'iconctrl', custom_svg: '', icon_weak: false, version: 'v4', status: 'built', updated: '2026-11-04' });
+const row = (id, name, contents, icon) => ({ uid: 'd-' + id, id, name, contents, icon, icon_source: 'iconctrl', custom_svg: '', icon_weak: false, version: 'v4', status: 'built', updated: '2026-11-04', ground: '', ground_name: '' });
 
 const ROWS = [
   row('D1', 'Test', 'Meter, leads, logic analyzer, calipers', 'multimeter'),

@@ -4,6 +4,10 @@ export const STANDARDS = [
     key: 'bisley',
     name: 'BISLEY',
     prefix: 'BISLEY',
+    // BISLEY finishes for label grounds (FC-R102). Only finishes Drew confirms go here (Q19): name, BISLEY code and RAL where
+    // known, a start colour, and where it came from. Start colours are estimates until a test strip matches them.
+    // { key: 'goose-grey', name: 'Goose grey', code: '', ral: '', hex: '#A8ADA8', source: 'estimate' }
+    finishes: [],
     border: 1.5,                // the Liene adds this per side in Separate mode
     dpi: 300,
     // Card sizes (FC-R18). card is what's cut; window is where ink may go: the holder's opening, or with no holder the whole FILE.

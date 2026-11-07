@@ -2,8 +2,8 @@
 // Label v4. Coordinates are 300 dpi pixels from the top-left of FILE. renderLabel returns SVG sized in mm.
 import { derive } from './geometry.js';
 import { fitLabel, textArea, advance } from './fit.js';
+import { inkFor } from './colour.js';
 
-const BK = '#101010', GY1 = '#4A4A4A', GY2 = '#7C7C7C', GY3 = '#B4B4B4';
 const ICON_MM = 14, ID_AT = 0.6, ID_PT = 5, ID_EM = 0.08, NAME_EM = 0.04;
 const DIVIDER_INSET = 2.5, GAP_MM = 1, LINE = 1.22, NAME_LINE = 1.08;
 
@@ -21,7 +21,8 @@ function tracked(font, text, x, y, size, em) {
 export function labelOps(fonts, std, drawer, iconPath) {
   const g = derive(std);
   const fit = fitLabel(fonts, g, drawer.name, drawer.contents);
-  const ops = [];
+  const ops = [], k = inkFor(drawer.ground);   // FC-R105: the ink follows the ground
+  const BK = k.full, GY1 = k.contents, GY2 = k.id, GY3 = k.rule;
   const sx = g.X(g.icon);
   ops.push({ t: 'rect', x: sx - 1, y: g.Y(DIVIDER_INSET), w: 2, h: g.Y(std.window.h - DIVIDER_INSET) - g.Y(DIVIDER_INSET) + 1, fill: GY3 });
   if (drawer.id) {
@@ -52,7 +53,7 @@ export function labelOps(fonts, std, drawer, iconPath) {
     ops.push({ t: 'fill', d: fonts.regular.getPath(line, start, y + inkTop(fonts.regular, line, contentsSize), contentsSize).toPathData(2), fill: GY1 });
     y += lh;
   }
-  return { ops, fit, geo: g };
+  return { ops, fit, geo: g, ground: k.ground, paint: k.ground === '#FFFFFF' ? '#fff' : k.ground };
 }
 
 export function opsToSvg(ops) {
@@ -67,15 +68,15 @@ const mm = (v) => Math.round(v * 1000) / 1000;
 
 // viewBox in print pixels, physical size in mm
 export function renderLabel(fonts, std, drawer, iconPath) {
-  const { ops, geo: g } = labelOps(fonts, std, drawer, iconPath);
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${mm(g.file.w)}mm" height="${mm(g.file.h)}mm" viewBox="0 0 ${g.W} ${g.H}"><rect width="${g.W}" height="${g.H}" fill="#fff"/>${opsToSvg(ops)}</svg>`;
+  const { ops, geo: g, paint } = labelOps(fonts, std, drawer, iconPath);
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${mm(g.file.w)}mm" height="${mm(g.file.h)}mm" viewBox="0 0 ${g.W} ${g.H}"><rect width="${g.W}" height="${g.H}" fill="${paint}"/>${opsToSvg(ops)}</svg>`;
 }
 
 // The label on its card, with the steel frame over it (FC-R35)
 export function renderProof(fonts, std, drawer, iconPath) {
-  const { ops, geo: g } = labelOps(fonts, std, drawer, iconPath);
+  const { ops, geo: g, paint } = labelOps(fonts, std, drawer, iconPath);
   const wx = (g.CW - g.px(std.window.w)) / 2, wy = (g.CH - g.px(std.window.h)) / 2;
   const ww = g.px(std.window.w), wh = g.px(std.window.h);
   const frame = `M0 0H${g.CW}V${g.CH}H0ZM${wx} ${wy}V${wy + wh}H${wx + ww}V${wy}Z`;
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${g.CW} ${g.CH}"><rect width="${g.CW}" height="${g.CH}" fill="#fff"/><g transform="translate(${g.B} ${g.B})">${opsToSvg(ops)}</g><path fill="#969696" fill-opacity=".78" fill-rule="evenodd" d="${frame}"/></svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${g.CW} ${g.CH}"><rect width="${g.CW}" height="${g.CH}" fill="${paint}"/><g transform="translate(${g.B} ${g.B})">${opsToSvg(ops)}</g><path fill="#969696" fill-opacity=".78" fill-rule="evenodd" d="${frame}"/></svg>`;
 }

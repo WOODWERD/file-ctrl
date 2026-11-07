@@ -14,7 +14,7 @@ import { ICONS } from '../site/icons/icons.js';
 const buf = (f) => { const b = readFileSync(f); return b.buffer.slice(b.byteOffset, b.byteOffset + b.length); };
 const fonts = parseFonts(buf('site/fonts/InterTight-700.ttf'), buf('site/fonts/InterTight-400.ttf'));
 const std = standardByKey('bisley');
-const row = (o) => ({ id: '11', name: '', contents: '', icon: 'kit', icon_source: 'iconctrl', custom_svg: '', icon_weak: false, version: 'v3', status: 'built', updated: '', size: '', ...o });
+const row = (o) => ({ id: '11', name: '', contents: '', icon: 'kit', icon_source: 'iconctrl', custom_svg: '', icon_weak: false, version: 'v3', status: 'built', updated: '', size: '', ground: '', ground_name: '', ...o });
 
 test('FC-A06 and FC-A07 names and icons stay unique', () => {
   assert.equal(nameUsedBy(SEED, 'solder', '11').id, '03');

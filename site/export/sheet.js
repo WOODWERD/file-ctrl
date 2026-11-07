@@ -26,8 +26,8 @@ export function renderSheet(fonts, std, drawers, iconOf) {
   const g = derive(std), l = sheetLayout(std), s = sheetPixels(std);
   const parts = drawers.map((d, i) => {
     const x = g.px(l.mx + (i % l.cols) * l.pitchX), y = g.px(l.my + Math.floor(i / l.cols) * l.pitchY);
-    const { ops } = labelOps(fonts, std, d, iconOf(d));
-    return `<g transform="translate(${x} ${y + g.W}) rotate(-90)"><rect width="${g.W}" height="${g.H}" fill="#fff"/>${opsToSvg(ops)}</g>`;
+    const { ops, paint } = labelOps(fonts, std, d, iconOf(d));
+    return `<g transform="translate(${x} ${y + g.W}) rotate(-90)"><rect width="${g.W}" height="${g.H}" fill="${paint}"/>${opsToSvg(ops)}</g>`;
   });
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${SHEET.w}mm" height="${SHEET.h}mm" viewBox="0 0 ${s.w} ${s.h}">${parts.join('')}</svg>`;
 }
@@ -37,6 +37,7 @@ export const PAGES = {
   a4: { key: 'a4', name: 'A4', w: 210, h: 297 }
 };
 const PAGE_MARGIN = 6.35, CARD_GAP = 3;
+export const BLEED = 1.5;   // half the gap, so neighbouring bleeds meet and never overlap
 
 export function pageLayout(std, page) {
   const { w, h } = std.card, pad = 2 * PAGE_MARGIN;
@@ -51,7 +52,10 @@ export function renderPagePreview(fonts, std, drawers, iconOf, page) {
   const g = derive(std), l = pageLayout(std, page);
   const parts = drawers.slice(0, l.perPage).map((d, i) => {
     const x = g.px(l.x + (i % l.cols) * (std.card.w + l.gap) + std.border), y = g.px(l.y + Math.floor(i / l.cols) * (std.card.h + l.gap) + std.border);
-    return `<g transform="translate(${x} ${y})">${opsToSvg(labelOps(fonts, std, d, iconOf(d)).ops)}</g>`;
+    const { ops, ground } = labelOps(fonts, std, d, iconOf(d));
+    // A coloured card runs 1.5 mm past its cut, so a hand cut leaves no white edge (FC-R104)
+    const bleed = ground === '#FFFFFF' ? '' : `<rect x="${-g.B - g.px(BLEED)}" y="${-g.B - g.px(BLEED)}" width="${g.CW + 2 * g.px(BLEED)}" height="${g.CH + 2 * g.px(BLEED)}" fill="${ground}"/>`;
+    return `<g transform="translate(${x} ${y})">${bleed}${opsToSvg(ops)}</g>`;
   });
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${g.px(page.w)} ${g.px(page.h)}"><rect width="100%" height="100%" fill="#fff"/>${parts.join('')}</svg>`;
 }

@@ -1,6 +1,6 @@
 // Vector PDF of full cards with crop marks and a 50 mm scale bar (FC-R69, FC-R70).
 import { labelOps } from '../label/render.js';
-import { pageLayout } from './sheet.js';
+import { pageLayout, BLEED } from './sheet.js';
 
 const PT = 72 / 25.4;
 const hex = (lib, h) => lib.rgb(...[1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255));
@@ -35,7 +35,9 @@ export async function buildPdf(lib, fonts, groups, iconOf, pageSize) {
     const on = drawers.slice(start, start + l.perPage);
     on.forEach((d, i) => {
       const cx = l.x + (i % l.cols) * (std.card.w + l.gap), cy = l.y + Math.floor(i / l.cols) * (std.card.h + l.gap);
-      const { ops } = labelOps(fonts, std, d, iconOf(d));
+      const { ops, ground } = labelOps(fonts, std, d, iconOf(d));
+      // FC-R104: a coloured card fills past its cut by BLEED. White stays bare paper, as before.
+      if (ground !== '#FFFFFF') page.drawRectangle({ x: (cx - BLEED) * PT, y: h - (cy + std.card.h + BLEED) * PT, width: (std.card.w + 2 * BLEED) * PT, height: (std.card.h + 2 * BLEED) * PT, color: hex(lib, ground) });
       drawOps(lib, page, ops, (cx + std.border) * PT, (cy + std.border) * PT, h);
     });
     // Crop marks run in the page margin, one per cut line

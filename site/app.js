@@ -19,6 +19,7 @@ import { ICONS } from './icons/icons.js';
 import { migrate } from './icons/legacy.js';
 import { client, repoError, toRecord, SETUP_URL, TOKEN_URL } from './registry/github.js';
 import { syncOnce, resolve, same, waiting } from './registry/sync.js';
+import { normHex, isWhite, readability, stripShades, isMatched, baseName } from './label/colour.js';
 
 const $ = (id) => document.getElementById(id);
 const app = $('app');
@@ -31,6 +32,7 @@ const S = {
   std: STANDARDS[0], drawers: [], units: true, examples: true, storageOk: true,
   status: 'all', weakOnly: false, picked: new Set(), showLib: false,
   flow: null, importing: null, importError: '', confirmFresh: false, undo: null, move: null,
+  colour: null, strip: null,   // FC-S31 colour preview and FC-S33 test strip pick
   route: 'sheet', upright: false, job: null,
   // GitHub storage (FC-R71 to FC-R88). conn is saved apart from the registry; the rest lives only while the page is open.
   gh: { conn: null, form: null, canWrite: true, isPrivate: true, state: 'off', error: null, conflict: null, hold: null, choice: null, busy: false, again: false, at: '', note: '' }
@@ -53,7 +55,7 @@ function applyRecord(rec) {
   S.std = standardByKey(rec.standard);
   S.units = rec.drawers.every((d) => UNITS.some((u) => u.test(d.id)));
   S.drawers = withSizes(rec.drawers.map(migrate).map(withUid), unitsNow());
-  S.examples = false; S.picked.clear(); S.undo = null; S.move = null;
+  S.examples = false; S.picked.clear(); S.undo = null; S.move = null; S.colour = null; S.strip = null;
   persist();
 }
 const ghClient = () => client(S.gh.conn.repo, S.gh.conn.token);
@@ -140,7 +142,7 @@ function disconnect() {
 }
 
 const shortVal = (v) => (v === true ? 'Yes' : v === false ? 'No' : String(v ?? '').length > 60 ? String(v).slice(0, 57) + '…' : String(v ?? '') || 'blank');
-const FIELD = { id: 'Drawer ID', name: 'Name', contents: 'Contents', icon: 'Icon', icon_source: 'Icon source', custom_svg: 'Custom icon', icon_weak: 'Weak icon', version: 'Label version', status: 'Status', size: 'Card size' };
+const FIELD = { id: 'Drawer ID', name: 'Name', contents: 'Contents', icon: 'Icon', icon_source: 'Icon source', custom_svg: 'Custom icon', icon_weak: 'Weak icon', version: 'Label version', status: 'Status', size: 'Card size', ground: 'Label colour', ground_name: 'Colour name' };
 
 function githubArea() {
   const g = S.gh, link = `<a href="${SETUP_URL}">Set up GitHub</a>`;
@@ -171,10 +173,121 @@ function githubArea() {
     const c = g.conflict;
     h += `<div class="health warn" role="status"><b>Changed on two devices</b><span>Choose which to keep for each. Nothing goes to GitHub until you do.</span></div><div class="conflicts">${c.conflicts.map((x, i) => `<div class="cf"><span class="small"><span class="mono">${esc(x.id)}</span> · ${esc(FIELD[x.field] || x.field)}</span>
       <div class="segc" role="group" aria-label="Keep for ${esc(x.id)} ${esc(FIELD[x.field] || x.field)}"><button type="button" data-act="gh-keep" data-i="${i}" data-v="mine" aria-pressed="${c.keep[i] === 'mine'}">This device: ${esc(shortVal(x.mine))}</button><button type="button" data-act="gh-keep" data-i="${i}" data-v="theirs" aria-pressed="${c.keep[i] === 'theirs'}">GitHub: ${esc(shortVal(x.theirs))}</button></div></div>`).join('')}</div>
-      <div class="tools"><button class="key" type="button" data-act="gh-resolve">Keep these and sync</button></div>`;
+      <div class="tools"><button class="key" type="button" data-act="gh-keepall" data-v="mine">This device for all</button><button class="key" type="button" data-act="gh-keepall" data-v="theirs">GitHub for all</button><button class="key" type="button" data-act="gh-resolve">Keep these and sync</button></div>`;
   }
   if (g.hold) h += `<div class="health bad" role="alert"><b>Same ID, name or icon on two drawers</b><span>Another device's change and one here now clash. ${esc(g.hold.join(' '))} Move or change one of them, and it syncs.</span></div>`;
   return `<div class="gh" id="github">${h}</div>`;
+}
+
+/* ---- Label colour (FC-R100 to FC-R111) ---- */
+const swatch = (hex, big) => `<i class="sw${big ? ' big' : ''}${isWhite(hex) ? ' white' : ''}" style="background:${isWhite(hex) ? '#FFFFFF' : hex}" aria-hidden="true"></i>`;
+const colourName = (d) => (isWhite(d.ground) ? 'White' : d.ground_name || normHex(d.ground));
+// The pull-down: White, the standard's finishes, colours already on other drawers, then Custom (FC-R101 to FC-R103)
+function colourChoices() {
+  const out = [{ v: 'white', name: 'White', hex: '' }];
+  for (const f of S.std.finishes || []) out.push({ v: 'f:' + f.key, name: f.name, hex: normHex(f.hex), note: 'not matched yet' });
+  const seen = new Set(out.map((c) => c.hex + '|' + c.name));
+  for (const d of S.drawers) {
+    if (isWhite(d.ground)) continue;
+    const k = normHex(d.ground) + '|' + colourName(d);
+    if (seen.has(k)) continue;
+    seen.add(k); out.push({ v: 'u:' + out.length, name: colourName(d), hex: normHex(d.ground), note: isMatched(d.ground_name) ? '' : 'not matched yet' });
+  }
+  out.push({ v: 'custom', name: 'Custom', hex: '' });
+  return out;
+}
+const choiceLabel = (c) => c.name + (c.hex && c.hex !== c.name ? ` · ${c.hex}` : '') + (c.note ? ` · ${c.note}` : '');
+const unitDrawers = (key) => (key === 'all' ? S.drawers : S.drawers.filter((d) => unitOf(d.id, unitsNow())?.key === key));
+const unitName = (key) => (key === 'all' ? 'Drawers' : UNITS.find((u) => u.key === key)?.name || key);
+function unitColour(key) {
+  const list = unitDrawers(key);
+  if (!list.length) return { hex: '', name: 'White', mixed: false };
+  const a = list[0], mixed = list.some((d) => normHex(d.ground) !== normHex(a.ground) || colourName(d) !== colourName(a));
+  return mixed ? { hex: '', name: 'Mixed', mixed: true } : { hex: normHex(a.ground), name: colourName(a), mixed: false };
+}
+// The colour a new drawer takes: what most of its unit's drawers have (FC-R101)
+function usualColour(id) {
+  const u = unitOf(id, unitsNow()), list = u ? unitDrawers(u.key) : S.units ? [] : S.drawers, n = new Map();
+  for (const d of list) { const k = normHex(d.ground) + '|' + (d.ground_name || ''); n.set(k, (n.get(k) || 0) + 1); }
+  const best = [...n.entries()].sort((a, b) => b[1] - a[1])[0];
+  if (!best) return { ground: '', ground_name: '' };
+  const [ground, ground_name] = best[0].split('|');
+  return { ground, ground_name: ground ? ground_name : '' };
+}
+
+function colourCtl(key) {
+  const c = unitColour(key);
+  const head = `<span class="gcol">${c.mixed ? '<i class="sw mixed" aria-hidden="true"></i>' : swatch(c.hex)}<span>${esc(c.name)}</span>`;
+  if (readOnly()) return head + '</span>';
+  const opts = colourChoices().map((x) => `<option value="${esc(x.v)}">${esc(choiceLabel(x))}</option>`).join('');
+  return head + `<select class="in" data-act="ucolour" data-unit="${esc(key)}" aria-label="Label colour for ${esc(unitName(key))}"><option value="" selected>Change colour</option>${opts}</select></span>`;
+}
+
+// FC-S31: the unit's labels in the new colour before anything changes
+function colourPreview(key) {
+  const c = S.colour;
+  if (!c || c.unit !== key) return '';
+  const hex = c.custom ? normHex(c.customHex) : c.hex, name = c.custom ? (hex || 'Custom') : c.name;
+  const list = unitDrawers(key), n = list.filter((d) => normHex(d.ground) !== hex || colourName(d) !== (hex ? name : 'White')).length;
+  const r = hex ? readability(hex) : { level: 'ok' };
+  const custom = c.custom ? `<div class="tools"><label class="f"><span>Hex colour</span><input class="in m" id="cHex" value="${esc(c.customHex || '')}" placeholder="#A8ADA8" autocomplete="off" spellcheck="false"></label><label class="f"><span>Pick</span><input type="color" id="cPick" value="${hex || '#FFFFFF'}" aria-label="Pick a colour"></label></div>` : '';
+  const shown = list.slice(0, 3).map((d) => `<span class="lbl mini${sd(d).size === 'file' ? ' wide' : ''}">${proof({ ...d, ground: hex, ground_name: hex ? name : '' })}</span>`).join('');
+  const warn = r.level === 'hold' ? `<div class="health bad" role="alert"><b>The names won't read on this colour</b><span>Pick a lighter or darker one.</span></div>` : r.level === 'note' ? `<div class="health warn" role="status"><b>Faint on this colour</b><span>The names read at ${r.ratio.toFixed(1)} : 1. A lighter or darker shade reads better.</span></div>` : '';
+  const ready = c.custom ? !!hex : true;
+  return `<div class="cprev"><div class="health warn" role="status"><b>${swatch(hex, true)}Set ${esc(unitName(key))} to ${esc(hex ? name : 'White')}?</b><span>${n} ${n === 1 ? 'label' : 'labels'} to reprint. Each goes back to Built and is selected for printing.${hex && !isMatched(name) ? ' Not matched to your drawer yet, so print a test strip first.' : ''}</span></div>
+    ${custom}<div class="minis">${shown}</div>${warn}
+    <div class="tools"><button class="key" type="button" data-act="colour-yes" ${ready && r.level !== 'hold' && n ? '' : 'disabled'}>Apply to ${n} ${n === 1 ? 'label' : 'labels'}</button>${hex ? `<button class="key" type="button" data-act="strip" data-unit="${esc(key)}">Print a test strip</button>` : ''}<button class="key" type="button" data-act="colour-no">Cancel</button></div></div>`;
+}
+
+function setColour(key, hex, name, picked) {
+  const before = { drawers: S.drawers.map((d) => ({ ...d })), picked: [...S.picked] };
+  const nm = hex ? name : '';
+  const ids = [];
+  for (const d of unitDrawers(key)) {
+    if (normHex(d.ground) === hex && (d.ground_name || '') === nm) continue;
+    d.ground = hex; d.ground_name = nm; d.status = 'built'; d.updated = today(); S.picked.add(d.id); ids.push(d.id);
+  }
+  const n = ids.length, text = `${unitName(key)} set to ${hex ? name : 'White'}${picked ? ` (${picked})` : ''} · ${n} ${n === 1 ? 'label' : 'labels'} to reprint`;
+  S.undo = { kind: 'colour', before, text };
+  S.colour = null; S.strip = null; S.job = null; followFlow(); changed(); say(text);
+}
+
+// FC-S33: pick the closest shade from a printed strip
+function stripPick(key) {
+  const t = S.strip;
+  if (!t || t.unit !== key) return '';
+  const shades = stripShades(t.hex, t.step);
+  return `<div class="cprev"><div class="health" role="status"><b>Which shade matches the drawer?</b><span>Hold the strip against a ${esc(unitName(key))} drawer in daylight and pick the closest code. B2 is ${esc(t.name)} as it is now.</span></div>
+    <div class="strip" role="group" aria-label="Test strip shades">${shades.map((x) => `<button type="button" class="shade" data-act="strip-pick" data-v="${x.code}" aria-pressed="${t.pick === x.code}">${swatch(x.hex, true)}<span class="mono">${x.code}</span><em class="mono">${x.hex}</em></button>`).join('')}</div>
+    <div class="tools"><button class="key" type="button" data-act="strip-use" ${t.pick ? '' : 'disabled'}>Use ${t.pick || 'this one'}</button><button class="key" type="button" data-act="strip-finer" ${t.pick ? '' : 'disabled'}>Print a finer strip</button><button class="key" type="button" data-act="strip-no">Cancel</button></div></div>`;
+}
+
+async function printStrip(key, hex, name, step) {
+  const d = unitDrawers(key)[0] || S.drawers[0];
+  if (!d) return;
+  const std = withSize(S.std, 'multidrawer');
+  const shades = stripShades(hex, step).map((x) => ({ ...d, uid: 'strip-' + x.code, id: x.code, ground: x.hex, ground_name: name, size: 'multidrawer' }));
+  const pdf = S.route === 'letter' || S.route === 'a4';
+  S.job = { busy: true, at: 0, of: 9 }; draw();
+  try {
+    let file;
+    if (pdf) {
+      await loadScript('vendor/pdf-lib.min.js');
+      const bytes = await buildPdf(window.PDFLib, fonts, [{ std, drawers: shades }], iconOf, PAGES[S.route]);
+      file = `${S.std.prefix}_TestStrip_${slug(name)}_${PAGES[S.route].name}.pdf`;
+      download(new Blob([bytes], { type: 'application/pdf' }), file);
+    } else {
+      const p = sheetPixels(std), c = await svgToCanvas(renderSheet(fonts, std, shades, iconOf), p.w, p.h);
+      file = `${S.std.prefix}_TestStrip_${slug(name)}.png`;
+      download(await canvasToPng(c), file);
+    }
+    S.job = null;
+    S.strip = { unit: key, hex, name, step, pick: '' }; S.colour = null;
+    say(`Saved ${file}. Print it, then pick the closest shade.`);
+  } catch (e) {
+    S.job = { error: e.message || 'The browser stopped the download. Allow downloads for this page and try again.' };
+  }
+  draw();
 }
 
 /* ---- Drawers (Area 1) ---- */
@@ -218,7 +331,7 @@ function card(d) {
 }
 
 function groups(list) {
-  if (!S.units) return [{ name: 'Drawers', note: '', items: list }];
+  if (!S.units) return [{ name: 'Drawers', unit: 'all', note: '', items: list }];
   // Slot order, with each empty slot as a drop target while dragging (FC-R96, FC-S30)
   const empty = (u) => u.slots.filter((id) => !S.drawers.some((d) => d.id === id)).map((id) => ({ empty: true, id, unit: u.key, wide: u.size === 'file' }));
   const out = UNITS.map((u) => ({ name: u.name, unit: u.key, note: u.measured ? '' : "Card size isn't measured yet", items: slotOrder([...list.filter((d) => u.test(d.id)), ...(readOnly() ? [] : empty(u))], u) }));
@@ -238,7 +351,7 @@ function area1() {
   if (S.importError) body += `<div class="health bad" role="alert"><b>Import refused</b><span>${esc(S.importError)} Your registry hasn't changed.</span></div><div class="tools"><button class="key" type="button" data-act="dismiss">Dismiss</button></div>`;
   if (S.importing) body += `<div class="health warn" role="status"><b>Replace the registry?</b><span>${esc(S.importing.file)} has ${S.importing.rows.length} drawers with no repeated names or icons. It replaces the ${S.drawers.length} here${S.gh.conn ? `, and on GitHub too. GitHub's history keeps the old one` : ''}. Export first if you want to keep them.</span></div><div class="tools"><button class="key" type="button" data-act="import-yes">Replace ${S.drawers.length} with ${S.importing.rows.length}</button><button class="key" type="button" data-act="import-no">Cancel</button></div>`;
   if (S.confirmFresh) body += `<div class="health warn" role="status"><b>Start fresh?</b><span>This clears all ${S.drawers.length} drawers from this browser${S.gh.conn ? `, and from GitHub too. GitHub's history keeps the old registry` : ''}. Export first if you want to keep them.</span></div><div class="tools"><button class="key danger" type="button" data-act="fresh-yes">Clear ${S.drawers.length} drawers</button><button class="key" type="button" data-act="fresh-no">Cancel</button></div>`;
-  if (S.undo) body += `<div class="health" role="status"><b>${S.undo.kind === 'move' ? esc(S.undo.text) : `Removed ${esc(S.undo.d.id)} ${esc(S.undo.d.name)}`}</b><span></span><button class="key" type="button" data-act="undo">Undo</button></div>`;   // FC-S29
+  if (S.undo) body += `<div class="health" role="status"><b>${S.undo.text ? esc(S.undo.text) : `Removed ${esc(S.undo.d.id)} ${esc(S.undo.d.name)}`}</b><span></span><button class="key" type="button" data-act="undo">Undo</button></div>`;   // FC-S29
   if (S.move?.where === 'lib') body += movePreview();
   if (S.examples && S.drawers.length) body += `<div class="health" role="status"><b>Example drawers</b><span>These ${S.drawers.length} show how labels look. Edit them, or use Start fresh to begin your own list.</span></div>`;
   if (!S.drawers.length) {
@@ -249,7 +362,7 @@ function area1() {
       <span class="sp"></span><button class="key" type="button" data-act="pickall">${list.length && list.every((d) => S.picked.has(d.id)) ? 'Clear selection' : 'Select all to print'}</button>
       ${readOnly() ? '' : '<button class="key go" type="button" data-act="new" style="height:34px;font-size:var(--t-cap)">New drawer</button>'}</div>`;
     if (!list.length) body += `<div class="stack" style="align-items:flex-start;padding-block:34px"><p style="margin:0">Nothing matches these filters.</p><button class="key" type="button" data-act="clearfilter">Clear filters</button></div>`;
-    for (const g of groups(list)) body += `<div class="group" data-unit="${g.unit || ''}"><div class="ghead"><b>${esc(g.name)}</b><span>${g.note}</span></div><div class="grid">${g.items.map(card).join('')}</div></div>`;
+    for (const g of groups(list)) body += `<div class="group" data-unit="${g.unit || ''}"><div class="ghead"><b>${esc(g.name)}</b><span>${g.note}</span>${g.unit ? colourCtl(g.unit) : ''}</div>${g.unit ? colourPreview(g.unit) + stripPick(g.unit) : ''}<div class="grid">${g.items.map(card).join('')}</div></div>`;
   }
   return `<section class="tier" aria-labelledby="a1">
     <div class="tier-h"><span class="n">1</span><h2 id="a1">Drawers</h2><span class="tier-d">Every label made, by cabinet</span><span class="tier-s ${st.cls}">${st.text}</span></div>
@@ -323,7 +436,7 @@ function doMove() {
 }
 
 /* ---- Label flow (Area 2) ---- */
-const blank = () => ({ id: '', name: '', contents: '', icon: '', icon_source: 'iconctrl', custom_svg: '', icon_weak: false, version: 'v4', status: 'built', updated: '', size: '' });
+const blank = () => ({ id: '', name: '', contents: '', icon: '', icon_source: 'iconctrl', custom_svg: '', icon_weak: false, version: 'v4', status: 'built', updated: '', size: '', ground: '', ground_name: '' });
 
 function startFlow(d) {
   S.flow = { step: d ? 2 : 1, isNew: !d, inUse: false, draft: d ? { ...d } : blank(), result: null, query: '', custom: false, svgText: '', svgFails: [] };
@@ -353,6 +466,14 @@ function iconResults(q) {
 function pickIcon(name) {
   const f = S.flow, d = f.draft;
   d.icon = name; d.icon_source = 'iconctrl'; d.custom_svg = ''; d.icon_weak = false;
+}
+
+// One drawer's own colour, in step 2 (FC-R101)
+function drawerColour(f) {
+  const d = f.draft, list = colourChoices();
+  const cur = f.customColour ? 'custom' : isWhite(d.ground) ? 'white' : list.find((x) => x.hex === normHex(d.ground) && x.name === colourName(d))?.v || 'custom';
+  const custom = cur === 'custom' ? `<label class="f"><span>Hex colour</span><input class="in m" id="fGround" value="${esc(f.groundText ?? normHex(d.ground))}" placeholder="#A8ADA8" autocomplete="off" spellcheck="false"></label>` : '';
+  return `<label class="f"><span>Label colour</span><select class="in" data-act="dcolour" aria-label="Label colour">${list.map((x) => `<option value="${esc(x.v)}"${x.v === cur ? ' selected' : ''}>${esc(choiceLabel(x))}</option>`).join('')}</select></label>${custom}`;
 }
 
 const stepRow = (n, title, val, inner, cur) => `<div class="step${n < cur ? ' done' : n === cur ? ' now' : ''}"><span class="dot">${n}</span><div class="sb"><div class="sh"><b>${title}</b><span class="sv">${val}</span></div>${n === cur ? inner : ''}</div></div>`;
@@ -399,7 +520,7 @@ function previewFig(f) {
   if (!d.name && !d.contents && !d.icon && !f.inUse) return `<div style="aspect-ratio:47/25;border:1px dashed var(--strong);border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:var(--t-cap);color:var(--soft)">The label appears here</div><figcaption class="small">Nothing to show yet.</figcaption>`;
   const show = f.inUse ? S.drawers.find((x) => x.id === d.id) : d;
   const r = fitNow(show);
-  return `<span class="lbl">${proof(show)}</span><figcaption class="small">${f.inUse ? `Current label for drawer ${esc(d.id)}.` : 'Live proof, as it looks in the holder. The gray is the steel frame.'}</figcaption><p class="small mono">Name ${r.namePt} pt · Contents ${r.contentsPt} pt · ${r.lines.length} ${r.lines.length === 1 ? 'line' : 'lines'}</p>`;
+  return `<span class="lbl">${proof(show)}</span><figcaption class="small">${f.inUse ? `Current label for drawer ${esc(d.id)}.` : `Live proof, as it looks in the holder. The gray is the steel frame.${isWhite(show.ground) ? '' : ` Colour: ${esc(colourName(show))}.`}`}</figcaption><p class="small mono">Name ${r.namePt} pt · Contents ${r.contentsPt} pt · ${r.lines.length} ${r.lines.length === 1 ? 'line' : 'lines'}</p>`;
 }
 
 function area2() {
@@ -410,9 +531,9 @@ function area2() {
   const s1 = f.inUse
     ? `<label class="f"><span>ID</span><input class="in m" id="fId" value="${esc(d.id)}"></label><div class="health warn" role="status"><b>${esc(d.id)} already has a label</b><span>${esc(S.drawers.find((x) => x.id === d.id)?.name)}, shown here. Replacing it keeps the ID and overwrites the rest.</span></div><div class="tools"><button class="key" type="button" data-act="replace">Replace ${esc(d.id)}</button><button class="key" type="button" data-act="otherid">Pick another ID</button></div>`
     : `<label class="f"><span>ID</span><input class="in m" id="fId" value="${esc(d.id)}" placeholder="01"></label><div class="tools"><button class="key" type="button" data-act="idnext" ${d.id ? '' : 'disabled'}>Next</button></div>`;
-  const s2 = `<label class="f"><span>Card size</span><select class="in" data-act="size" aria-label="Card size">${S.std.sizes.map((z) => `<option value="${z.key}"${sd(d).size === z.key ? ' selected' : ''}>${esc(z.name)} · ${z.card.w} × ${z.card.h}</option>`).join('')}</select></label><label class="f"><span>Name</span><input class="in" id="fName" value="${esc(d.name)}"></label><label class="f"><span>Contents</span><input class="in" id="fContents" value="${esc(d.contents)}"></label><div class="tools"><button class="key" type="button" data-act="check" ${d.name ? '' : 'disabled'}>Check the name</button></div>`;
+  const s2 = `<label class="f"><span>Card size</span><select class="in" data-act="size" aria-label="Card size">${S.std.sizes.map((z) => `<option value="${z.key}"${sd(d).size === z.key ? ' selected' : ''}>${esc(z.name)} · ${z.card.w} × ${z.card.h}</option>`).join('')}</select></label>${drawerColour(f)}<label class="f"><span>Name</span><input class="in" id="fName" value="${esc(d.name)}"></label><label class="f"><span>Contents</span><input class="in" id="fContents" value="${esc(d.contents)}"></label><div class="tools"><button class="key" type="button" data-act="check" ${d.name ? '' : 'disabled'}>Check the name</button></div>`;
   const s4 = `<label class="f"><span>Contents</span><input class="in" id="fContents" value="${esc(d.contents)}"></label><p class="small" id="trimLine">Aim for 3 to 5 items, comma-separated, within 2 lines. This one has ${n} ${n === 1 ? 'item' : 'items'} on ${lines} ${lines === 1 ? 'line' : 'lines'}.</p><div class="tools"><button class="key" type="button" data-act="next">Next</button></div>`;
-  const s6 = `<p class="small">The gray is the steel frame. Only the white area shows in the holder.</p><div class="stack" style="gap:5px">${checkList(d)}</div><div class="tools"><button class="key go" type="button" data-act="save" ${held ? 'disabled' : ''}>Save drawer ${esc(d.id)}</button><button class="key" type="button" data-act="back">Back</button>${f.isNew ? '' : '<button class="key danger" type="button" data-act="remove">Remove</button>'}</div>`;
+  const s6 = `<p class="small">The gray is the steel frame. Only the ${isWhite(d.ground) ? 'white' : 'coloured'} area shows in the holder.</p><div class="stack" style="gap:5px">${checkList(d)}</div><div class="tools"><button class="key go" type="button" data-act="save" ${held ? 'disabled' : ''}>Save drawer ${esc(d.id)}</button><button class="key" type="button" data-act="back">Back</button>${f.isNew ? '' : '<button class="key danger" type="button" data-act="remove">Remove</button>'}</div>`;
   const rstate = !f.result ? (cur > 2 ? '' : 'Not checked yet') : f.result.kind === 'unknown' ? 'Not checked' : f.result.kind === 'ok' ? 'Name fits the contents' : 'Your call';
   const state = f.inUse ? ['ID in use', 'warn'] : held && cur >= 6 ? ["Can't save yet", 'warn'] : f.svgFails.length ? ['SVG rejected', 'bad'] : f.result && cur === 3 && !['ok', 'unknown'].includes(f.result.kind) ? ['One suggestion', 'warn'] : f.isNew && cur === 1 ? ['New drawer', 'idle'] : ['In progress', 'idle'];
   return `<section class="tier" aria-labelledby="a2">
@@ -460,7 +581,8 @@ function area3() {
     : r === 'single'
       ? `<div class="tools"><div class="segc" role="group" aria-label="Orientation"><button type="button" data-act="orient" data-v="r" aria-pressed="${!S.upright}">Rotated</button><button type="button" data-act="orient" data-v="u" aria-pressed="${S.upright}">Upright</button></div></div>${(groups.length ? groups : bySize(S.drawers)).map((g) => { const f = derive(g.std).file; return `<div class="setv"><div>${esc(g.std.sizeName)}</div><div>W<b>${S.upright ? f.w : f.h}</b> H<b>${S.upright ? f.h : f.w}</b></div></div>`; }).join('')}<ol class="setl"><li>Import each label as its own image.</li><li>Lock on, then type the size above for every label.</li><li>Cutting mode: Separate, not Overall.</li><li>Keep inside 90 × 170, at least 4 mm between stickers.</li><li>Don't use AI remove BG.</li></ol>`
       : `<div class="setv">${(groups.length ? groups : bySize(S.drawers)).map((g) => `<div>${esc(g.std.sizeName)} per page<b>${pdf ? pageLayout(g.std, page).perPage : ''}</b></div>`).join('')}<div>Scale<b>100 %</b></div></div><ol class="setl"><li>Print at 100 %. Turn off Fit to page.</li><li>Check the 50 mm bar with a ruler.</li><li>Print on card, then cut on the marks.</li></ol>`;
-  const tested = pdf ? 'Works on any printer. Sizes need checking with a ruler.' : 'Tested on the Liene PixCut S1 with the Liene Photo Mac app.';
+  const tinted = ok.some((d) => !isWhite(d.ground));
+  const tested = pdf ? `Works on any printer. Sizes need checking with a ruler.${tinted ? ' Colours were matched on the Liene. Print a test strip on this printer first.' : ''}` : 'Tested on the Liene PixCut S1 with the Liene Photo Mac app.';
   const jobUi = j?.busy ? `<div class="stack" role="status" style="gap:5px"><div class="bar"><i style="width:${Math.round(j.at / j.of * 100)}%"></i></div><p class="small mono">Saving ${j.at} of ${j.of}</p></div>`
     : j?.done ? `<div class="health ok" role="status"><b>Saved</b><span>${esc(j.file)}${j.held ? `. ${j.held} held back` : ''}, in your downloads.</span></div><div class="tools"><button class="key" type="button" data-act="markprinted">Mark ${j.ids.length} as printed</button><button class="key" type="button" data-act="notyet">Not yet</button></div>`
       : j?.error ? `<div class="health bad" role="alert"><b>Couldn't save</b><span>${esc(j.error)} Nothing was marked printed.</span></div>` : '';
@@ -600,12 +722,20 @@ const actions = {
     keepFocus('[data-act=move-yes]');
   },
   'move-yes': () => doMove(),
+  'colour-yes': () => { const c = S.colour, hex = c.custom ? normHex(c.customHex) : c.hex; setColour(c.unit, hex, c.custom ? hex : c.name); },
+  'colour-no': () => { S.colour = null; },
+  strip: (el) => { const c = S.colour, hex = c.custom ? normHex(c.customHex) : c.hex; return printStrip(el.dataset.unit, hex, baseName(c.custom ? hex : c.name), 4); },
+  'strip-pick': (el) => { S.strip.pick = el.dataset.v; },
+  'strip-use': () => { const t = S.strip, x = stripShades(t.hex, t.step).find((s) => s.code === t.pick); setColour(t.unit, x.hex, `${baseName(t.name)}, tuned ${t.pick}`, `test strip ${t.pick}`); },
+  'strip-finer': () => { const t = S.strip, x = stripShades(t.hex, t.step).find((s) => s.code === t.pick); return printStrip(t.unit, x.hex, t.name, Math.max(1, t.step / 2)); },
+  'strip-no': () => { S.strip = null; },
   'move-mode': () => { S.move.mode = S.move.mode === 'swap' ? 'shift' : 'swap'; },
   'move-no': () => { const back = S.move?.where === 'flow'; S.move = null; if (back) keepFocus('#fMove'); },
   showlib: () => { S.showLib = !S.showLib; },
   cancel: () => { S.flow = null; S.move = null; },
   idnext: () => {
     if (!S.flow.sizeSet) S.flow.draft.size = sizeKeyFor({ id: S.flow.draft.id.trim() }, unitsNow());
+    if (!S.flow.colourSet) Object.assign(S.flow.draft, usualColour(S.flow.draft.id.trim()));
     const f = S.flow, id = f.draft.id.trim();
     if (S.drawers.some((x) => x.id === id)) { f.inUse = true; return; }
     f.step = 2; keepFocus('#fName');
@@ -650,7 +780,7 @@ const actions = {
   },
   undo: () => {
     const u = S.undo;
-    if (u.kind === 'move') { S.drawers = u.before.drawers; S.picked = new Set(u.before.picked); followFlow(); } else S.drawers.splice(u.at, 0, u.d);
+    if (u.kind === 'move' || u.kind === 'colour') { S.drawers = u.before.drawers; S.picked = new Set(u.before.picked); followFlow(); } else S.drawers.splice(u.at, 0, u.d);
     S.undo = null; changed();
   },
   filter: (el) => { S.status = el.dataset.v; },
@@ -678,6 +808,7 @@ const actions = {
   'gh-usegh': () => choose(false),
   'gh-usemine': () => choose(true),
   'gh-keep': (el) => { S.gh.conflict.keep[+el.dataset.i] = el.dataset.v; },
+  'gh-keepall': (el) => { S.gh.conflict.keep = S.gh.conflict.keep.map(() => el.dataset.v); },
   'gh-resolve': () => {
     const c = S.gh.conflict, kept = resolve(c.merged, c.conflicts, c.keep);
     applyRecord(kept); store.saveSync({ repo: S.gh.conn.repo, sha: c.remoteSha, base: c.remote });
@@ -685,7 +816,7 @@ const actions = {
   }
 };
 // FC-R83: a look-only device can't change the registry
-const EDITS = new Set(['new', 'edit', 'save', 'remove', 'undo', 'fresh', 'fresh-yes', 'import-yes', 'markprinted', 'grip', 'moveid', 'move-yes', 'move-mode']);
+const EDITS = new Set(['new', 'edit', 'save', 'remove', 'undo', 'fresh', 'fresh-yes', 'import-yes', 'markprinted', 'grip', 'moveid', 'move-yes', 'move-mode', 'colour-yes', 'strip', 'strip-use', 'strip-finer']);
 
 app.addEventListener('click', (e) => {
   const el = e.target.closest('button[data-act]');
@@ -706,6 +837,17 @@ app.addEventListener('change', (e) => {
   else if (a === 'size') { S.flow.draft.size = el.value; S.flow.sizeSet = true; $('flowPreview').innerHTML = previewFig(S.flow); }
   else if (a === 'status' && !readOnly()) { const d = S.drawers.find((x) => x.id === el.dataset.id); d.status = el.value; d.updated = today(); changed(); draw(); }
   else if (a === 'moveto' && !readOnly() && el.value !== S.flow.editingId) { S.move = { uid: S.flow.draft.uid, to: el.value, mode: 'shift', where: 'flow' }; draw(); keepFocus('[data-act=move-yes]'); }
+  else if (a === 'ucolour' && !readOnly() && el.value) {
+    const c = colourChoices().find((x) => x.v === el.value);
+    S.strip = null; S.undo = null;
+    S.colour = c.v === 'custom' ? { unit: el.dataset.unit, custom: true, customHex: unitColour(el.dataset.unit).hex } : { unit: el.dataset.unit, hex: c.hex, name: c.name };
+    draw(); keepFocus(c.v === 'custom' ? '#cHex' : '[data-act=colour-yes]');
+  } else if (a === 'dcolour') {
+    const f = S.flow, c = colourChoices().find((x) => x.v === el.value);
+    f.colourSet = true; f.customColour = c.v === 'custom'; f.groundText = undefined;
+    if (c.v !== 'custom') { f.draft.ground = c.hex; f.draft.ground_name = c.hex ? c.name : ''; }
+    draw(); if (f.customColour) keepFocus('#fGround');
+  } else if (el.id === 'cPick') { S.colour.customHex = el.value.toUpperCase(); draw(); keepFocus('#cPick'); }
   else if (a === 'standard') { S.std = standardByKey(el.value); persist(); syncSoon(); draw(); }
   else if (a === 'import' && el.files[0]) importFile(el.files[0]);
 });
@@ -713,12 +855,14 @@ app.addEventListener('change', (e) => {
 app.addEventListener('input', (e) => {
   const f = S.flow, el = e.target;
   if (el.id === 'ghRepo' || el.id === 'ghToken') { S.gh.form[el.id === 'ghRepo' ? 'repo' : 'token'] = el.value; return; }
+  if (el.id === 'cHex' && S.colour) { S.colour.customHex = el.value; clearTimeout(S.colour.t); S.colour.t = setTimeout(() => { draw(); keepFocus('#cHex'); }, 250); return; }
   if (!f) return;
   const set = (k) => {
     f.draft[k] = el.value;
     $('flowPreview').innerHTML = previewFig(f);
   };
   if (el.id === 'fMove') { f.moveTo = el.value; return; }
+  if (el.id === 'fGround') { f.groundText = el.value; const h = normHex(el.value); f.draft.ground = h; f.draft.ground_name = h; $('flowPreview').innerHTML = previewFig(f); return; }
   if (el.id === 'fId') { f.draft.id = el.value; const b = app.querySelector('[data-act=idnext]'); if (b) b.disabled = !el.value.trim(); }
   else if (el.id === 'fName') { set('name'); f.result = null; const b = app.querySelector('[data-act=check]'); if (b) b.disabled = !el.value.trim(); }
   else if (el.id === 'fContents') {
@@ -768,6 +912,7 @@ addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
   if (drag) { app.querySelectorAll('.dragging, .lifted, .drop').forEach((x) => x.classList.remove('dragging', 'lifted', 'drop')); drag.cancel = true; drag.on = false; }
   else if (S.move) { S.move = null; draw(); }
+  else if (S.colour || S.strip) { S.colour = null; S.strip = null; draw(); }
 });
 
 function led(id, c) { $('led-' + id).className = 'led' + (c ? ' on-' + c : ''); }

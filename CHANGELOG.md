@@ -2,6 +2,15 @@
 
 What changed in each version of [File Ctrl](https://woodwerd.github.io/file-ctrl/), newest first. Versions are x-numbers while File Ctrl is a public beta.
 
+## x0.0.9 · 2026-11-06
+- Colour on the label. Each set of drawers can be printed in a colour to match its cabinet. Choose it beside the set's name in the library, or give one drawer its own under Label colour.
+- File Ctrl shows the labels in the new colour before anything changes. Applying it selects them for reprinting, and Undo puts it back.
+- On dark colours the name, icon and number are left as bare white paper. On light ones they print black. White labels print exactly as before.
+- Print a test strip of nine shades, coded A1 to C3, hold it against the drawer and pick the closest. The pick is saved as tuned.
+- PDFs run a coloured label 1.5 mm past the crop marks, so a hand cut has no white edge.
+- When the same drawer is changed on two devices, you can now keep this device's or GitHub's for every change at once.
+- The guide has a new Colour on the label section.
+
 ## x0.0.8 · 2026-11-06
 - Move a drawer to another slot. Drag its ID in the library, or open the drawer and choose Move to. The drawers in between shift one slot, or choose Swap instead to trade two.
 - Before anything changes, File Ctrl lists every drawer number that will change. Each drawer with a new number goes back to Built and is selected, ready to reprint. Undo puts it all back.

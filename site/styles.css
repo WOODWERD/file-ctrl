@@ -230,3 +230,21 @@ a.led{text-decoration:none}
 .card.drop{outline:2px solid var(--accent);outline-offset:1px}
 ul.moves{margin:0;padding:0 0 0 18px;font-size:var(--t-cap);display:flex;flex-direction:column;gap:3px}
 @media (max-width:640px){.cmeta .grip{min-width:34px;height:34px}}
+
+/* Label colour (FC-U16). The swatch follows WOODWERD Digital's Swatch: a circle with a 1 px inner ring, beside its name. */
+.sw{display:inline-block;width:21px;height:21px;border-radius:50%;flex:none;box-shadow:inset 0 0 0 1px var(--strong);vertical-align:middle}
+.sw.big{width:34px;height:34px}
+.sw.mixed{background:conic-gradient(var(--soft) 0 25%,var(--surface) 0 50%,var(--soft) 0 75%,var(--surface) 0)}
+.health b .sw{margin-right:8px}
+.gcol{margin-left:auto;display:inline-flex;align-items:center;gap:8px;color:var(--ink)}
+.gcol select{width:auto;padding:4px 8px;font-size:var(--t-cap)}
+.cprev{display:flex;flex-direction:column;gap:8px;padding:8px 0 13px}
+.minis{display:flex;flex-wrap:wrap;gap:8px}
+.lbl.mini{display:block;width:144px}
+.lbl.mini.wide{width:233px}
+.lbl.mini svg{display:block;width:100%;height:auto}
+.strip{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;max-width:420px}
+.shade{display:flex;align-items:center;gap:8px;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);font-size:var(--t-cap);text-align:left;min-width:0}
+.shade em{font-style:normal;color:var(--soft);font-size:var(--t-micro)}
+.shade[aria-pressed="true"]{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
+@media (max-width:520px){.gcol{margin-left:0}.strip{grid-template-columns:repeat(3,minmax(0,1fr))}.shade em{display:none}}

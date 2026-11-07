@@ -1,7 +1,8 @@
 import { migrate } from '../icons/legacy.js';
+import { normHex } from '../label/colour.js';
 
 // Registry import and export. CSV follows RFC 4180, so custom SVGs keep their line breaks (FC-R24, FC-A16).
-export const COLUMNS = ['id', 'name', 'contents', 'icon', 'icon_source', 'custom_svg', 'icon_weak', 'version', 'status', 'updated', 'size', 'uid'];
+export const COLUMNS = ['id', 'name', 'contents', 'icon', 'icon_source', 'custom_svg', 'icon_weak', 'version', 'status', 'updated', 'size', 'uid', 'ground', 'ground_name'];
 const STATUS = ['built', 'printed', 'installed'];
 
 // A drawer's hidden key, so sync can follow it when its ID changes (FC-R97). Older registries get d- plus the ID, so every device agrees.
@@ -42,6 +43,9 @@ export function normalise(o) {
   if (!STATUS.includes(d.status)) d.status = 'built';
   d.version = d.version || 'v4';
   d.uid = String(d.uid).trim() || 'd-' + d.id;
+  // FC-R100: blank or unreadable is white, which has no name
+  d.ground = normHex(d.ground);
+  d.ground_name = d.ground ? String(d.ground_name).trim() : '';
   return migrate(d);
 }
 

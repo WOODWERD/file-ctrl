@@ -2,8 +2,9 @@
 import { normalise } from './csv.js';
 import { duplicates } from './uniqueness.js';
 import { README_PATH, readme } from './github.js';
+import { UNITS } from './seed.js';
 
-const FIELDS = ['id', 'name', 'contents', 'icon', 'icon_source', 'custom_svg', 'icon_weak', 'version', 'status', 'updated', 'size'];
+const FIELDS = ['id', 'name', 'contents', 'icon', 'icon_source', 'custom_svg', 'icon_weak', 'version', 'status', 'updated', 'size', 'ground', 'ground_name'];
 const canon = (rec) => JSON.stringify({ standard: rec.standard, drawers: rec.drawers.map(normalise) });
 export const same = (a, b) => canon(a) === canon(b);
 const rowSame = (a, b) => (!a && !b) || (!!a && !!b && JSON.stringify(normalise(a)) === JSON.stringify(normalise(b)));
@@ -52,22 +53,35 @@ function movePart(moved) {
   return `${tag(main)} moved to ${main[1].id}` + (moved.length > 1 ? `, ${moved.length - 1} renumbered` : '');
 }
 
+// FC-R110: "10-drawer colour set to Goose grey, 10 to reprint"
+function colourPart(recoloured, after) {
+  if (!recoloured.length) return '';
+  const name = recoloured[0].ground_name || (recoloured[0].ground ? recoloured[0].ground : 'White');
+  const same = recoloured.every((d) => d.ground === recoloured[0].ground && d.ground_name === recoloured[0].ground_name);
+  const n = recoloured.length, reprint = `${n} to reprint`;
+  if (!same) return `${n} label colours changed, ${reprint}`;
+  const u = UNITS.find((x) => recoloured.every((d) => x.test(d.id)) && [...after.values()].filter((d) => x.test(d.id)).length === n);
+  if (u) return `${u.name} colour set to ${name}, ${reprint}`;
+  return n <= 2 ? `${recoloured.map((d) => `${d.id} ${d.name}`).join(', ')} colour set to ${name}` : `${n} drawers colour set to ${name}, ${reprint}`;
+}
+
 // "File Ctrl: 05 PASSIVES changed, 2 marked printed" (FC-R78)
 export function commitMessage(before, after) {
   const B = byUid(before), A = byUid(after), tag = (d) => `${d.id} ${d.name}`;
   const added = [...A.values()].filter((d) => !B.has(d.uid));
   const removed = [...B.values()].filter((d) => !A.has(d.uid));
-  const changed = [], printed = [], moved = [];
+  const changed = [], printed = [], moved = [], recoloured = [];
   for (const d of A.values()) {
     const o = B.get(d.uid);
     if (!o || rowSame(o, d)) continue;
+    if ((o.ground !== d.ground || o.ground_name !== d.ground_name) && FIELDS.every((f) => ['ground', 'ground_name', 'status', 'updated'].includes(f) || o[f] === d[f])) { recoloured.push(d); continue; }
     if (o.id !== d.id && FIELDS.every((f) => ['id', 'status', 'updated'].includes(f) || o[f] === d[f])) { moved.push([o, d]); continue; }
     const onlyStatus = FIELDS.every((f) => f === 'status' || f === 'updated' || o[f] === d[f]);
     if (onlyStatus && d.status !== o.status) printed.push(d); else changed.push(d);
   }
   const part = (list, word) => (!list.length ? '' : list.length <= 2 ? `${list.map(tag).join(', ')} ${word}` : `${list.length} drawers ${word}`);
   const statusPart = !printed.length ? '' : printed.every((d) => d.status === printed[0].status) ? `${printed.length} marked ${printed[0].status}` : `${printed.length} status changes`;
-  const parts = [movePart(moved), part(added, 'added'), part(changed, 'changed'), part(removed, 'removed'), statusPart].filter(Boolean);
+  const parts = [movePart(moved), colourPart(recoloured, A), part(added, 'added'), part(changed, 'changed'), part(removed, 'removed'), statusPart].filter(Boolean);
   if (!parts.length && before?.standard !== after.standard) parts.push(`cabinet standard ${after.standard}`);
   return 'File Ctrl: ' + (parts.join(', ') || 'saved');
 }
