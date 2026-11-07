@@ -118,6 +118,10 @@ textarea.in{height:89px;padding:8px;resize:vertical}
 .sh b{font-weight:600;color:var(--soft)}
 .step.now .sh b,.step.done .sh b{color:var(--ink)}
 .sv{color:var(--soft);min-width:0}
+.sh.go{width:100%;min-height:21px;padding:0;margin:0;background:none;border:0;border-radius:3px;color:inherit;font:inherit;font-size:var(--t-cap);text-align:left;cursor:pointer}
+.sh.go:hover b{text-decoration:underline;text-underline-offset:3px}
+button.dot{padding:0;cursor:pointer;background:transparent;font-family:inherit}
+.step.done button.dot{background:var(--ink)}
 .icons{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
 .icb{display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 3px;background:transparent;border:1px solid var(--line);border-radius:8px;color:var(--ink);cursor:pointer;font:400 var(--t-micro) Inter,Arial,sans-serif;min-width:0}
 .icb[aria-pressed="true"]{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}

@@ -477,7 +477,13 @@ function drawerColour(f) {
   return `<label class="f"><span>Label colour</span><select class="in" data-act="dcolour" aria-label="Label colour">${list.map((x) => `<option value="${esc(x.v)}"${x.v === cur ? ' selected' : ''}>${esc(choiceLabel(x))}</option>`).join('')}</select></label>${custom}`;
 }
 
-const stepRow = (n, title, val, inner, cur) => `<div class="step${n < cur ? ' done' : n === cur ? ' now' : ''}"><span class="dot">${n}</span><div class="sb"><div class="sh"><b>${title}</b><span class="sv">${val}</span></div>${n === cur ? inner : ''}</div></div>`;
+// FC-R38, FC-U17: any step opens from its heading, in any order. The open step's heading isn't a button.
+const stepRow = (n, title, val, inner, cur, can, has) => {
+  const go = can && n !== cur, cls = n === cur ? ' now' : has || (n < cur && val) ? ' done' : '';
+  const dot = go ? `<button class="dot" type="button" data-act="goto" data-v="${n}" tabindex="-1" aria-hidden="true">${n}</button>` : `<span class="dot">${n}</span>`;
+  const head = `<b>${title}</b><span class="sv">${val}</span>`;
+  return `<div class="step${cls}">${dot}<div class="sb">${go ? `<button class="sh go" type="button" data-act="goto" data-v="${n}" aria-label="Open step ${n}, ${title}">${head}</button>` : `<div class="sh">${head}</div>`}${n === cur ? inner : ''}</div></div>`;
+};
 
 function resultStrip(f) {
   const r = f.result, d = f.draft;
@@ -535,18 +541,19 @@ function area2() {
   const s2 = `<label class="f"><span>Card size</span><select class="in" data-act="size" aria-label="Card size">${S.std.sizes.map((z) => `<option value="${z.key}"${sd(d).size === z.key ? ' selected' : ''}>${esc(z.name)} · ${z.card.w} × ${z.card.h}</option>`).join('')}</select></label>${drawerColour(f)}<label class="f"><span>Name</span><input class="in" id="fName" value="${esc(d.name)}"></label><label class="f"><span>Contents</span><input class="in" id="fContents" value="${esc(d.contents)}"></label><div class="tools"><button class="key" type="button" data-act="check" ${d.name ? '' : 'disabled'}>Check the name</button></div>`;
   const s4 = `<label class="f"><span>Contents</span><input class="in" id="fContents" value="${esc(d.contents)}"></label><p class="small" id="trimLine">Aim for 3 to 5 items, comma-separated, within 2 lines. This one has ${n} ${n === 1 ? 'item' : 'items'} on ${lines} ${lines === 1 ? 'line' : 'lines'}.</p><div class="tools"><button class="key" type="button" data-act="next">Next</button></div>`;
   const s6 = `<p class="small">The gray is the steel frame. Only the ${isWhite(d.ground) ? 'white' : 'coloured'} area shows in the holder.</p><div class="stack" style="gap:5px">${checkList(d)}</div><div class="tools"><button class="key go" type="button" data-act="save" ${held ? 'disabled' : ''}>Save drawer ${esc(d.id)}</button><button class="key" type="button" data-act="back">Back</button>${f.isNew ? '' : '<button class="key danger" type="button" data-act="remove">Remove</button>'}</div>`;
-  const rstate = !f.result ? (cur > 2 ? '' : 'Not checked yet') : f.result.kind === 'unknown' ? 'Not checked' : f.result.kind === 'ok' ? 'Name fits the contents' : 'Your call';
+  const can = !f.inUse && !(f.isNew && cur === 1);   // a new drawer needs its ID first
+  const rstate = !f.result ? 'Not checked yet' : f.result.kind === 'unknown' ? 'Not checked' : f.result.kind === 'ok' ? 'Name fits the contents' : 'Your call';
   const state = f.inUse ? ['ID in use', 'warn'] : held && cur >= 6 ? ["Can't save yet", 'warn'] : f.svgFails.length ? ['SVG rejected', 'bad'] : f.result && cur === 3 && !['ok', 'unknown'].includes(f.result.kind) ? ['One suggestion', 'warn'] : f.isNew && cur === 1 ? ['New drawer', 'idle'] : ['In progress', 'idle'];
   return `<section class="tier" aria-labelledby="a2">
     <div class="tier-h"><span class="n">2</span><h2 id="a2">Label</h2><span class="tier-d">${f.isNew ? (d.id ? 'New drawer ' + esc(d.id) : 'Name a drawer, pick its icon, check the proof') : 'Editing drawer ' + esc(f.editingId)}</span><span class="tier-s ${state[1]}">${state[0]}</span></div>
     <div class="pad"><div class="split">
       <div class="steps">
-        ${f.isNew ? stepRow(1, 'Drawer ID', `<span class="mono">${cur > 1 ? esc(d.id) : ''}</span>`, s1, cur) : `<div class="step done"><span class="dot">1</span><div class="sb"><div class="sh"><b>Drawer ID</b><span class="sv"><span class="mono">${esc(f.editingId)}</span></span></div>${moveCtl(f)}</div></div>`}
-        ${stepRow(2, 'Name and contents', cur > 2 ? esc(d.name) : '', s2, cur)}
-        ${stepRow(3, 'Name check', rstate, resultStrip(f), cur)}
-        ${stepRow(4, 'Contents trim', cur > 4 ? `${n} items · ${lines} ${lines === 1 ? 'line' : 'lines'}` : '', s4, cur)}
-        ${stepRow(5, 'Icon', cur > 5 ? esc(d.icon) : '', iconPanel(f), cur)}
-        ${stepRow(6, 'Proof and save', '', s6, cur)}
+        ${f.isNew ? stepRow(1, 'Drawer ID', `<span class="mono">${cur > 1 ? esc(d.id) : ''}</span>`, s1, cur, !f.inUse, cur > 1) : `<div class="step done"><span class="dot">1</span><div class="sb"><div class="sh"><b>Drawer ID</b><span class="sv"><span class="mono">${esc(f.editingId)}</span></span></div>${moveCtl(f)}</div></div>`}
+        ${stepRow(2, 'Name and contents', esc(d.name), s2, cur, can, !!d.name)}
+        ${stepRow(3, 'Name check', rstate, resultStrip(f), cur, can && !!d.name, !!f.result)}
+        ${stepRow(4, 'Contents trim', d.contents ? `${n} items · ${lines} ${lines === 1 ? 'line' : 'lines'}` : '', s4, cur, can, !!d.contents)}
+        ${stepRow(5, 'Icon', esc(d.icon), iconPanel(f), cur, can, !!d.icon)}
+        ${stepRow(6, 'Proof and save', '', s6, cur, can, false)}
       </div>
       <figure class="proof" id="flowPreview">${previewFig(f)}</figure>
     </div><div class="tools"><button class="key" type="button" data-act="cancel">Cancel</button></div></div>
@@ -763,6 +770,13 @@ const actions = {
     if (f.step === 4 && !f.query) f.query = [f.draft.name, ...items(f.draft.contents).slice(0, 2)].join(', ');
     f.step += 1;
     if (f.step === 5) keepFocus('#iconQ');
+  },
+  goto: (el) => {
+    const f = S.flow, n = Number(el.dataset.v);
+    if (n === 3) f.result = nameCheck(f.draft, S.drawers, fits9(f.draft));
+    if (n === 5 && !f.query) f.query = [f.draft.name, ...items(f.draft.contents).slice(0, 2)].join(', ');
+    f.step = n;
+    keepFocus({ 1: '#fId', 2: '#fName', 4: '#fContents', 5: '#iconQ' }[n]);
   },
   back: () => { const f = S.flow; f.step = f.step === 6 ? 5 : 2; f.result = f.step === 2 ? null : f.result; },
   icon: (el) => { pickIcon(el.dataset.v); },

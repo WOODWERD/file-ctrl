@@ -2,6 +2,10 @@
 
 What changed in each version of [File Ctrl](https://woodwerd.github.io/file-ctrl/), newest first. Versions are x-numbers while File Ctrl is a public beta.
 
+## x0.0.15 · 2026-11-07
+- Open any step of a label by choosing its number or title, in any order. To change only the icon, choose 5. No more pressing Next through every step. Opening Name check runs the check; opening Icon fills in the search.
+- Closed steps now show what they hold, such as the name, the icon and the contents line count.
+
 ## x0.0.14 · 2026-11-06
 - Ticking or unticking a label, or changing its status, no longer jumps the page back to the top. Focus stays on the control you used.
 
