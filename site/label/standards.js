@@ -29,3 +29,8 @@ export function withSize(std, key) {
 }
 
 export const standardByKey = (key) => withSize(STANDARDS.find((s) => s.key === key) || STANDARDS[0]);
+
+// FC-R104: a coloured label on the Liene is drawn 1 mm past its card on every side and printed with border −1,
+// so the Liene cuts at the card size inside the colour. White labels keep the standard's border.
+export const LIENE_BLEED = 1;
+export const forLiene = (std, coloured) => (coloured ? { ...std, border: -LIENE_BLEED, coloured: true } : std);

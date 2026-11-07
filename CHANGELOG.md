@@ -2,6 +2,11 @@
 
 What changed in each version of [File Ctrl](https://woodwerd.github.io/file-ctrl/), newest first. Versions are x-numbers while File Ctrl is a public beta.
 
+## x0.0.12 · 2026-11-06
+- Coloured labels no longer show a white rim on the Liene. File Ctrl draws them 1 mm bigger than the card, and the print steps set the Liene border to −1, so the cut lands inside the colour. White labels are unchanged.
+- Coloured labels print on their own sheets, with Colour in the file name, and the steps and PRINT.txt give each its border. Coloured singles show their own size to type, such as W 27 × H 97.
+- Test strips print the same way.
+
 ## x0.0.11 · 2026-11-06
 - Icon Ctrl's Print set moves from x0.0.5 to x0.0.7: 151 icons, up from 135. New are helping hands, paper, a notebook, an envelope, sticky notes, a paper clip, a binder, a label roll, an ink bottle, a cardboard box, a filament spool, a battery cell, keys, a wallet, a card and toothpicks. Every icon your drawers already use is unchanged.
 

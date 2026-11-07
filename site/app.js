@@ -1,5 +1,5 @@
 // File Ctrl interface. Three Areas: Drawers, Label, Print (FC-U05). State IDs in comments match the spec.
-import { STANDARDS, standardByKey, withSize } from './label/standards.js';
+import { STANDARDS, standardByKey, withSize, forLiene } from './label/standards.js';
 import { derive } from './label/geometry.js';
 import { fitLabel } from './label/fit.js';
 import { loadFonts } from './label/fonts.js';
@@ -257,7 +257,7 @@ function stripPick(key) {
   const t = S.strip;
   if (!t || t.unit !== key) return '';
   const shades = stripShades(t.hex, t.step);
-  return `<div class="cprev"><div class="health" role="status"><b>Which shade matches the drawer?</b><span>Hold the strip against a ${esc(unitName(key))} drawer in daylight and pick the closest code. B2 is ${esc(t.name)} as it is now.</span></div>
+  return `<div class="cprev"><div class="health" role="status"><b>Which shade matches the drawer?</b><span>Print it ${S.route === 'letter' || S.route === 'a4' ? 'at 100 %' : 'on the Liene with Border −1'}, hold it against a ${esc(unitName(key))} drawer in daylight and pick the closest code. B2 is ${esc(t.name)} as it is now.</span></div>
     <div class="strip" role="group" aria-label="Test strip shades">${shades.map((x) => `<button type="button" class="shade" data-act="strip-pick" data-v="${x.code}" aria-pressed="${t.pick === x.code}">${swatch(x.hex, true)}<span class="mono">${x.code}</span><em class="mono">${x.hex}</em></button>`).join('')}</div>
     <div class="tools"><button class="key" type="button" data-act="strip-use" ${t.pick ? '' : 'disabled'}>Use ${t.pick || 'this one'}</button><button class="key" type="button" data-act="strip-finer" ${t.pick ? '' : 'disabled'}>Print a finer strip</button><button class="key" type="button" data-act="strip-no">Cancel</button></div></div>`;
 }
@@ -265,7 +265,8 @@ function stripPick(key) {
 async function printStrip(key, hex, name, step) {
   const d = unitDrawers(key)[0] || S.drawers[0];
   if (!d) return;
-  const std = withSize(S.std, 'multidrawer');
+  const pdfStrip = S.route === 'letter' || S.route === 'a4';
+  const std = forLiene(withSize(S.std, 'multidrawer'), !pdfStrip);
   const shades = stripShades(hex, step).map((x) => ({ ...d, uid: 'strip-' + x.code, id: x.code, ground: x.hex, ground_name: name, size: 'multidrawer' }));
   const pdf = S.route === 'letter' || S.route === 'a4';
   S.job = { busy: true, at: 0, of: 9 }; draw();
@@ -562,6 +563,15 @@ function queue() {
 
 // One group per card size, in the standard's order (FC-R59)
 const bySize = (list) => S.std.sizes.map((z) => ({ std: withSize(S.std, z.key), drawers: list.filter((d) => sd(d).size === z.key) })).filter((g) => g.drawers.length);
+// Liene groups: one per card size and per white or coloured, since the border differs (FC-R104)
+const lieneGroups = (list) => S.std.sizes.flatMap((z) => [false, true].map((c) => ({ std: forLiene(withSize(S.std, z.key), c), drawers: list.filter((d) => sd(d).size === z.key && !isWhite(d.ground) === c) }))).filter((g) => g.drawers.length);
+const groupName = (g) => g.std.sizeName + (g.std.coloured ? ', coloured' : '');
+const lieneStd = (d) => forLiene(sd(d), !isWhite(d.ground));
+function borderStep(groups, word) {
+  const kinds = new Set(groups.map((g) => !!g.std.coloured));
+  if (kinds.size === 2) return `Border 1.5 for white ${word}, −1 for coloured ${word}. Coloured file names include Colour.`;
+  return kinds.has(true) ? 'Border −1, so the colour runs past the cut.' : 'Border 1.5.';
+}
 const sheetsFor = (groups) => groups.reduce((n, g) => n + Math.ceil(g.drawers.length / sheetLayout(g.std).perSheet), 0);
 
 const slug = (s) => s.replace(/\b\w/g, (c) => c.toUpperCase()).replace(/[^A-Za-z0-9]/g, '');
@@ -570,16 +580,16 @@ const fileName = (d) => `${S.std.prefix}_Label_${d.id}_${slug(d.name)}.png`;
 function area3() {
   if (S.flow) return `<section class="tier shut"><div class="tier-h"><span class="n">3</span><h2>Print</h2><span class="tier-d">Save files for your printer</span><span class="tier-s idle">Save this drawer first</span></div></section>`;
   if (!S.drawers.length) return `<section class="tier shut"><div class="tier-h"><span class="n">3</span><h2>Print</h2><span class="tier-d">Save files for your printer</span><span class="tier-s idle">Nothing to print yet</span></div></section>`;
-  const { ok, held } = queue(), j = S.job, r = S.route, n = ok.length, groups = bySize(ok);
+  const { ok, held } = queue(), j = S.job, r = S.route, n = ok.length, groups = r === 'sheet' || r === 'single' ? lieneGroups(ok) : bySize(ok);
   const sheets = sheetsFor(groups);
   const pdf = r === 'letter' || r === 'a4', page = PAGES[r];
   const seg = (v, t) => `<button type="button" data-act="route" data-v="${v}" aria-pressed="${r === v}">${t}</button>`;
   const save = r === 'sheet' ? `Save ${sheets} ${sheets === 1 ? 'sheet' : 'sheets'}` : r === 'single' ? `Save ${n} ${n === 1 ? 'label' : 'labels'}` : `Save ${page.name} PDF`;
   const state = j?.busy ? ['Saving', 'busy'] : j?.done ? ['Saved', 'ok'] : j?.error ? ["Couldn't save", 'bad'] : [`${n} ${n === 1 ? 'label' : 'labels'} ready`, 'idle'];
   const side = r === 'sheet'
-    ? `<div class="health warn" role="status"><b>Print one sheet first</b><span>Sheet cutting is new at this size. Check one before a full run.</span></div><div class="setv"><div>W<b>90</b></div><div>H<b>170</b></div><div>X<b>0</b></div><div>Y<b>0</b></div></div><ol class="setl"><li>Import the sheet.</li><li>Lock aspect, then type the sizes above.</li><li>Cutting mode: Separate, not Overall. Border 1.5.</li><li>Don't use AI remove BG.</li></ol>`
+    ? `<div class="health warn" role="status"><b>Print one sheet first</b><span>Sheet cutting is new at this size. Check one before a full run.</span></div><div class="setv"><div>W<b>90</b></div><div>H<b>170</b></div><div>X<b>0</b></div><div>Y<b>0</b></div></div><ol class="setl"><li>Import the sheet.</li><li>Lock aspect, then type the sizes above.</li><li>Cutting mode: Separate, not Overall. ${borderStep(groups.length ? groups : [{ std: {} }], 'sheets')}</li><li>Don't use AI remove BG.</li></ol>`
     : r === 'single'
-      ? `<div class="tools"><div class="segc" role="group" aria-label="Orientation"><button type="button" data-act="orient" data-v="r" aria-pressed="${!S.upright}">Rotated</button><button type="button" data-act="orient" data-v="u" aria-pressed="${S.upright}">Upright</button></div></div>${(groups.length ? groups : bySize(S.drawers)).map((g) => { const f = derive(g.std).file; return `<div class="setv"><div>${esc(g.std.sizeName)}</div><div>W<b>${S.upright ? f.w : f.h}</b> H<b>${S.upright ? f.h : f.w}</b></div></div>`; }).join('')}<ol class="setl"><li>Import each label as its own image.</li><li>Lock on, then type the size above for every label.</li><li>Cutting mode: Separate, not Overall.</li><li>Keep inside 90 × 170, at least 4 mm between stickers.</li><li>Don't use AI remove BG.</li></ol>`
+      ? `<div class="tools"><div class="segc" role="group" aria-label="Orientation"><button type="button" data-act="orient" data-v="r" aria-pressed="${!S.upright}">Rotated</button><button type="button" data-act="orient" data-v="u" aria-pressed="${S.upright}">Upright</button></div></div>${(groups.length ? groups : lieneGroups(S.drawers)).map((g) => { const f = derive(g.std).file; return `<div class="setv"><div>${esc(groupName(g))}</div><div>W<b>${S.upright ? f.w : f.h}</b> H<b>${S.upright ? f.h : f.w}</b></div></div>`; }).join('')}<ol class="setl"><li>Import each label as its own image.</li><li>Lock on, then type the size above for every label.</li><li>Cutting mode: Separate, not Overall. ${borderStep(groups.length ? groups : lieneGroups(S.drawers), 'labels')}</li><li>Keep inside 90 × 170, at least 4 mm between stickers.</li><li>Don't use AI remove BG.</li></ol>`
       : `<div class="setv">${(groups.length ? groups : bySize(S.drawers)).map((g) => `<div>${esc(g.std.sizeName)} per page<b>${pdf ? pageLayout(g.std, page).perPage : ''}</b></div>`).join('')}<div>Scale<b>100 %</b></div></div><ol class="setl"><li>Print at 100 %. Turn off Fit to page.</li><li>Check the 50 mm bar with a ruler.</li><li>Print on card, then cut on the marks.</li></ol>`;
   const tinted = ok.some((d) => !isWhite(d.ground));
   const tested = pdf ? `Works on any printer. Sizes need checking with a ruler.${tinted ? ' Colours were matched on the Liene. Print a test strip on this printer first.' : ''}` : 'Tested on the Liene PixCut S1 with the Liene Photo Mac app.';
@@ -592,10 +602,10 @@ function area3() {
     let k = 0;
     for (const g of groups) {
       const l = sheetLayout(g.std), count = Math.ceil(g.drawers.length / l.perSheet);
-      for (let i = 0; i < count && k < 2; i++, k++) pv += `<figure class="sheet"><div class="pg"><span class="lbl">${renderSheet(fonts, g.std, g.drawers.slice(i * l.perSheet, (i + 1) * l.perSheet), iconOf)}</span></div><figcaption class="small">${esc(g.std.sizeName)} sheet ${i + 1} of ${count} · ${Math.min(g.drawers.length - i * l.perSheet, l.perSheet)} labels</figcaption></figure>`;
+      for (let i = 0; i < count && k < 2; i++, k++) pv += `<figure class="sheet"><div class="pg"><span class="lbl">${renderSheet(fonts, g.std, g.drawers.slice(i * l.perSheet, (i + 1) * l.perSheet), iconOf)}</span></div><figcaption class="small">${esc(groupName(g))} sheet ${i + 1} of ${count} · ${Math.min(g.drawers.length - i * l.perSheet, l.perSheet)} labels</figcaption></figure>`;
     }
   } else if (r === 'single') {
-    if (ok[0]) pv = `<figure class="sheet"><div class="proof" style="width:233px"><span class="lbl">${renderLabel(fonts, sd(ok[0]), ok[0], iconOf(ok[0]))}</span></div><figcaption class="small mono">${esc(fileName(ok[0]))}</figcaption></figure>`;
+    if (ok[0]) pv = `<figure class="sheet"><div class="proof" style="width:233px"><span class="lbl">${renderLabel(fonts, lieneStd(ok[0]), ok[0], iconOf(ok[0]))}</span></div><figcaption class="small mono">${esc(fileName(ok[0]))}</figcaption></figure>`;
   } else if (ok.length) pv = `<figure class="sheet"><div class="pdf"><span class="lbl">${renderPagePreview(fonts, groups[0].std, groups[0].drawers, iconOf, page)}</span></div><figcaption class="small">Page 1 · crop marks and scale bar are added to the PDF</figcaption></figure>`;
   return `<section class="tier" aria-labelledby="a3">
     <div class="tier-h"><span class="n">3</span><h2 id="a3">Print</h2><span class="tier-d">Save files for your printer</span><span class="tier-s ${state[1]}">${state[0]}</span></div>
@@ -629,16 +639,16 @@ const loadScript = (src) => (scripts[src] ||= new Promise((ok, no) => {
   document.head.append(s);
 }));
 
-function printTxt(route) {
-  const sheet = ['Liene PixCut S1, Mac app', '', 'Whole sheets', '1. Import the sheet.', '2. Lock aspect. Type W 90, H 170, X 0, Y 0.', '3. Cutting mode: Separate, not Overall. Border 1.5.', "4. Don't use AI remove BG.", '', 'Print one sheet before a full run.'];
-  const single = ['Liene PixCut S1, Mac app', '', '1. Import each label as its own image.', '2. Lock on. Type the size for every label. The app ignores file dpi.', ...S.std.sizes.map((z) => `   ${z.name}: W ${S.upright ? `${z.card.w - 3} x H ${z.card.h - 3}` : `${z.card.h - 3} x H ${z.card.w - 3}`}, prints at ${z.card.w} x ${z.card.h} mm`), '3. Cutting mode: Separate, not Overall. It adds 1.5 mm per side.', '4. File names start BISLEY_Label_ and the drawer ID.', '5. Keep everything inside 90 x 170, at least 4 mm between stickers.', "6. Don't use AI remove BG."];
+function printTxt(route, groups) {
+  const sheet = ['Liene PixCut S1, Mac app', '', 'Whole sheets', '1. Import the sheet.', '2. Lock aspect. Type W 90, H 170, X 0, Y 0.', `3. Cutting mode: Separate, not Overall. ${borderStep(groups, 'sheets')}`, "4. Don't use AI remove BG.", '', 'Print one sheet before a full run.'];
+  const single = ['Liene PixCut S1, Mac app', '', '1. Import each label as its own image.', '2. Lock on. Type the size for every label. The app ignores file dpi.', ...groups.map((g) => { const f = derive(g.std).file; return `   ${groupName(g)}: W ${S.upright ? `${f.w} x H ${f.h}` : `${f.h} x H ${f.w}`}, border ${g.std.coloured ? '-1' : '1.5'}, prints at ${g.std.card.w} x ${g.std.card.h} mm`; }), '3. Cutting mode: Separate, not Overall, with the border above.', '4. File names start BISLEY_Label_ and the drawer ID. Coloured labels end in _Colour.', '5. Keep everything inside 90 x 170, at least 4 mm between stickers.', "6. Don't use AI remove BG."];
   return (route === 'sheet' ? sheet : single).join('\n') + '\n';
 }
 
 const tick = () => new Promise((r) => setTimeout(r));
 
 async function exportNow() {
-  const { ok, held } = queue(), r = S.route, groups = bySize(ok);
+  const { ok, held } = queue(), r = S.route, groups = r === 'sheet' || r === 'single' ? lieneGroups(ok) : bySize(ok);
   S.job = { busy: true, at: 0, of: ok.length };
   draw();
   try {
@@ -657,15 +667,15 @@ async function exportNow() {
           for (let i = 0; i < count; i++) {
             const part = g.drawers.slice(i * l.perSheet, (i + 1) * l.perSheet);
             const c = await svgToCanvas(renderSheet(fonts, g.std, part, iconOf), p.w, p.h);
-            out.push([`${g.std.prefix}_${g.std.slug}Sheet_${i + 1}-of-${count}.png`, await canvasToPng(c)]);
+            out.push([`${g.std.prefix}_${g.std.slug}${g.std.coloured ? 'Colour' : ''}Sheet_${i + 1}-of-${count}.png`, await canvasToPng(c)]);
             done += part.length; S.job.at = done; draw(); await tick();
           }
         }
       } else {
         for (const [i, d] of ok.entries()) {
-          const g = derive(sd(d));
-          const c = await svgToCanvas(renderLabel(fonts, sd(d), d, iconOf(d)), g.W, g.H, !S.upright);
-          out.push([fileName(d), await canvasToPng(c)]);
+          const ls = lieneStd(d), g = derive(ls);
+          const c = await svgToCanvas(renderLabel(fonts, ls, d, iconOf(d)), g.W, g.H, !S.upright);
+          out.push([ls.coloured ? fileName(d).replace(/\.png$/, '_Colour.png') : fileName(d), await canvasToPng(c)]);
           S.job.at = i + 1; if (i % 4 === 0) { draw(); await tick(); }
         }
       }
@@ -674,7 +684,7 @@ async function exportNow() {
         await loadScript('vendor/jszip.min.js');
         const zip = new window.JSZip();
         for (const [n, b] of out) zip.file(n, b);
-        zip.file('PRINT.txt', printTxt(r));
+        zip.file('PRINT.txt', printTxt(r, groups));
         file = `${S.std.prefix}_Labels_${r === 'sheet' ? 'Sheets' : 'Singles'}.zip`;
         download(await zip.generateAsync({ type: 'blob' }), file);
       }

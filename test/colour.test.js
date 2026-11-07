@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { parseFonts } from '../site/label/fonts.js';
-import { standardByKey, withSize } from '../site/label/standards.js';
+import { standardByKey, withSize, forLiene, LIENE_BLEED } from '../site/label/standards.js';
 import { labelOps, renderLabel, renderProof } from '../site/label/render.js';
 import { normHex, inkFor, readability, contrast, stripShades, isMatched, baseName, WHITE_INK } from '../site/label/colour.js';
 import { SEED } from '../site/registry/seed.js';
@@ -11,7 +11,8 @@ import { readRegistry, toCsv } from '../site/registry/csv.js';
 import { toRecord } from '../site/registry/github.js';
 import { mergeRecords, commitMessage } from '../site/registry/sync.js';
 import { checks } from '../site/check/checks.js';
-import { renderSheet, renderPagePreview, PAGES } from '../site/export/sheet.js';
+import { renderSheet, renderPagePreview, PAGES, sheetLayout } from '../site/export/sheet.js';
+import { derive } from '../site/label/geometry.js';
 import { ICONS } from '../site/icons/icons.js';
 
 const buf = (f) => { const b = readFileSync(f); return b.buffer.slice(b.byteOffset, b.byteOffset + b.length); };
@@ -112,4 +113,26 @@ test('FC-R102 the BISLEY finishes are data, each with a start colour that reads'
   const f = standardByKey('bisley').finishes;
   assert.ok(f.some((x) => x.name === 'Golden Sunflower Yellow' && x.hex === '#E7AF28'));
   for (const x of f) { assert.equal(normHex(x.hex), x.hex); assert.equal(readability(x.hex).level, 'ok'); assert.ok(x.source); }
+});
+
+test('FC-R104 a coloured Liene label bleeds 1 mm past its card, with the ink where it was', () => {
+  for (const size of ['multidrawer', 'file']) {
+    const white = withSize(std, size), col = forLiene(white, true), gw = derive(white), gc = derive(col);
+    assert.equal(LIENE_BLEED, 1);
+    assert.deepEqual(gc.file, { w: white.card.w + 2, h: white.card.h + 2 });
+    // ink measured from the card's edge: FILE origin sits at +border on the card
+    const d = { ...SEED.find((x) => x.size === size), ground: '#E7AF28' };
+    const a = labelOps(fonts, white, d, icon(d)).ops, b = labelOps(fonts, col, d, icon(d)).ops;
+    const shift = gw.px(white.border) - gc.px(col.border);
+    a.filter((o) => o.t === 'rect').forEach((o, i) => { const q = b.filter((x) => x.t === 'rect')[i]; assert.ok(Math.abs(o.x + shift - q.x) <= 1 && Math.abs(o.y + shift - q.y) <= 1, size); });
+  }
+  assert.equal(forLiene(withSize(std, 'multidrawer'), false).border, 1.5);
+});
+
+test('FC-R104 coloured Liene sheets still hold 9 or 3, with the art 2 mm apart', () => {
+  const m = sheetLayout(forLiene(withSize(std, 'multidrawer'), true)), f = sheetLayout(forLiene(withSize(std, 'file'), true));
+  assert.equal(m.perSheet, 9);
+  assert.equal(f.perSheet, 3);
+  assert.equal(m.pitchX - m.across, 2);
+  assert.ok(m.mx >= 0 && m.my >= 0 && f.mx >= 0 && f.my >= 0);
 });
