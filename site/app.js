@@ -16,6 +16,8 @@ import { buildPdf } from './export/pdf.js';
 import { svgToCanvas, canvasToPng } from './export/png.js';
 import { ICONS } from './icons/icons.js';
 import { migrate } from './icons/legacy.js';
+import { client, repoError, toRecord, SETUP_URL, TOKEN_URL } from './registry/github.js';
+import { syncOnce, resolve, same, waiting } from './registry/sync.js';
 
 const $ = (id) => document.getElementById(id);
 const app = $('app');
@@ -28,7 +30,9 @@ const S = {
   std: STANDARDS[0], drawers: [], units: true, examples: true, storageOk: true,
   status: 'all', weakOnly: false, picked: new Set(), showLib: false,
   flow: null, importing: null, importError: '', confirmFresh: false, undo: null,
-  route: 'sheet', upright: false, job: null
+  route: 'sheet', upright: false, job: null,
+  // GitHub storage (FC-R71 to FC-R88). conn is saved apart from the registry; the rest lives only while the page is open.
+  gh: { conn: null, form: null, canWrite: true, isPrivate: true, state: 'off', error: null, conflict: null, hold: null, choice: null, busy: false, again: false, at: '', note: '' }
 };
 
 const iconOf = (d) => (d.icon_source === 'custom' ? checkSvg(d.custom_svg).d : ICONS[d.icon]?.f) || '';
@@ -39,7 +43,138 @@ const proof = (d) => renderProof(fonts, sd(d), d, iconOf(d));
 const persist = () => {
   S.storageOk = store.save({ standard: S.std.key, drawers: S.drawers, units: S.units, examples: S.examples, route: S.route });
 };
-const changed = () => { S.examples = false; persist(); };
+const changed = () => { S.examples = false; persist(); syncSoon(); };
+const readOnly = () => !!S.gh.conn && !S.gh.canWrite;
+
+/* ---- GitHub storage ---- */
+const record = () => toRecord(S.std.key, S.drawers);
+function applyRecord(rec) {
+  S.std = standardByKey(rec.standard);
+  S.units = rec.drawers.every((d) => UNITS.some((u) => u.test(d.id)));
+  S.drawers = withSizes(rec.drawers.map(migrate), unitsNow());
+  S.examples = false; S.picked.clear(); S.undo = null;
+  persist();
+}
+const ghClient = () => client(S.gh.conn.repo, S.gh.conn.token);
+const clock = () => new Date().toTimeString().slice(0, 5);
+let syncTimer = 0;
+function syncSoon() {
+  if (!S.gh.conn || readOnly()) return;
+  clearTimeout(syncTimer); syncTimer = setTimeout(syncNow, 3000);
+}
+function showError(e) {
+  S.gh.error = e; S.gh.state = e.kind === 'offline' ? 'offline' : 'attention';
+}
+async function syncNow() {
+  const g = S.gh;
+  if (!g.conn || g.conflict) return;
+  if (g.busy) { g.again = true; return; }
+  g.busy = true; g.state = 'saving'; draw();
+  try {
+    const gh = ghClient(), c = await gh.check();
+    if (c.error) { showError(c.error); return; }
+    g.isPrivate = c.private; g.canWrite = c.canWrite;
+    const st = store.loadSync();
+    const r = await syncOnce({ gh, repo: g.conn.repo, local: record(), base: st?.repo === g.conn.repo ? st.base : null, sha: st?.repo === g.conn.repo ? st.sha : null, readOnly: !c.canWrite });
+    g.error = null; g.hold = null;
+    if (r.status === 'synced') {
+      if (!same(r.record, record())) applyRecord(r.record);
+      store.saveSync({ repo: g.conn.repo, sha: r.sha, base: r.base });
+      g.state = c.canWrite ? 'synced' : 'readonly'; g.at = clock();
+      if (r.wrote) say('Synced to GitHub');
+    } else if (r.status === 'conflict') {
+      g.conflict = { ...r, keep: r.conflicts.map(() => 'mine') }; g.state = 'attention';
+    } else if (r.status === 'hold') {
+      applyRecord(r.record); store.saveSync({ repo: g.conn.repo, sha: r.sha, base: r.base });
+      g.hold = r.dups; g.state = 'attention';
+    } else {
+      if (r.record) { applyRecord(r.record); store.saveSync({ repo: g.conn.repo, sha: r.sha, base: r.base }); }
+      showError(r.error);
+    }
+  } finally {
+    g.busy = false; draw();
+    if (g.again) { g.again = false; syncSoon(); }
+  }
+}
+
+// Connect (FC-S24) and the first-connect choice (FC-S27)
+async function connect() {
+  const g = S.gh, f = g.form, repo = f.repo.trim(), token = f.token.trim();
+  f.error = repoError(repo) || (token ? '' : 'Paste the token you made on GitHub.');
+  if (f.error) { draw(); return; }
+  f.busy = true; draw();
+  const gh = client(repo, token), c = await gh.check();
+  f.busy = false;
+  if (c.error) { f.error = c.error.text; draw(); return; }
+  g.conn = { repo, token }; g.canWrite = c.canWrite; g.isPrivate = c.private; g.form = null; g.error = null;
+  g.note = store.saveGitHub(g.conn) ? '' : "This browser won't keep the token, so the connection lasts until you close this page.";
+  const st = store.loadSync();
+  if (st?.repo === repo && st.base) { await syncNow(); return; } // FC-R82: same repo, carry on
+  store.saveSync(null);
+  const rem = await gh.readRecord();
+  if (rem.error) { showError(rem.error); draw(); return; }
+  if (rem.missing || same(rem.record, record()) || !c.canWrite || S.examples) {
+    if (!rem.missing) { if (S.examples) applyRecord(rem.record); store.saveSync({ repo, sha: rem.sha, base: rem.record }); }
+    await syncNow(); return;
+  }
+  g.choice = { remote: rem.record, sha: rem.sha }; g.state = 'attention'; draw();
+}
+async function choose(mine) {
+  const g = S.gh, ch = g.choice;
+  g.choice = null;
+  if (mine) {
+    const w = await ghClient().writeRecord(record(), ch.sha, "File Ctrl: replaced with this device's registry");
+    if (w.error || w.stale) { showError(w.error || { kind: 'busy', text: 'GitHub changed while you chose. Connect again.' }); draw(); return; }
+    store.saveSync({ repo: g.conn.repo, sha: w.sha, base: record() });
+  } else {
+    applyRecord(ch.remote); store.saveSync({ repo: g.conn.repo, sha: ch.sha, base: ch.remote });
+  }
+  await syncNow();
+}
+function disconnect() {
+  clearTimeout(syncTimer);
+  store.saveGitHub(null); store.saveSync(null);
+  Object.assign(S.gh, { conn: null, form: null, canWrite: true, isPrivate: true, state: 'off', error: null, conflict: null, hold: null, choice: null, note: '' });
+  say('Disconnected from GitHub. The token is deleted from this browser.');
+}
+
+const shortVal = (v) => (v === true ? 'Yes' : v === false ? 'No' : String(v ?? '').length > 60 ? String(v).slice(0, 57) + '…' : String(v ?? '') || 'blank');
+const FIELD = { name: 'Name', contents: 'Contents', icon: 'Icon', icon_source: 'Icon source', custom_svg: 'Custom icon', icon_weak: 'Weak icon', version: 'Label version', status: 'Status', size: 'Card size' };
+
+function githubArea() {
+  const g = S.gh, link = `<a href="${SETUP_URL}">Set up GitHub</a>`;
+  let h = '';
+  if (!g.conn) {
+    if (!g.form) return `<div class="gh" id="github"><div class="ghrow"><b>GitHub</b><span class="small">Optional. Keep the registry in your own private GitHub repo, so it syncs between devices and keeps a history.</span><button class="key" type="button" data-act="gh-open">Connect to GitHub</button></div></div>`;
+    const f = g.form;
+    return `<div class="gh" id="github"><div class="ghrow"><b>Connect to GitHub</b><span class="small">Use a private repo just for File Ctrl, and a fine-grained token for that one repo with Contents read and write. A read-only token makes this device look-only. New to GitHub? Follow ${link}, step by step, or see <a href="guide.html#github">the guide</a>.</span></div>
+      <div class="ghform"><label class="f"><span>Repo</span><input class="in m" id="ghRepo" value="${esc(f.repo)}" placeholder="your-name/file-ctrl-data" autocomplete="off" spellcheck="false"></label>
+      <label class="f"><span>Token</span><input class="in m" id="ghToken" type="password" value="${esc(f.token)}" autocomplete="off" spellcheck="false"></label></div>
+      ${f.error ? `<div class="health bad" role="alert"><b>Not connected</b><span>${esc(f.error)}</span></div>` : ''}
+      <div class="tools"><button class="key" type="button" data-act="gh-connect" ${f.busy ? 'disabled' : ''}>${f.busy ? 'Checking' : 'Connect'}</button><a class="key" href="${TOKEN_URL}" target="_blank" rel="noopener">Make a token on GitHub</a><button class="key" type="button" data-act="gh-cancel">Cancel</button></div></div>`;
+  }
+  const st = store.loadSync(), n = st?.base ? waiting(st.base, record()) : 0;
+  const words = { saving: 'Syncing', synced: `Synced${g.at ? ' at ' + g.at : ''}`, offline: `Offline · ${n} waiting`, readonly: `Read only${g.at ? ' · fetched at ' + g.at : ''}`, attention: 'Needs attention', off: 'Not synced yet' };
+  h += `<div class="ghrow"><b>GitHub</b><span class="small"><span class="mono">${esc(g.conn.repo)}</span> · ${words[g.state] || ''}</span>
+    <button class="key" type="button" data-act="gh-sync" ${g.busy || g.conflict || g.choice ? 'disabled' : ''}>Sync now</button><button class="key" type="button" data-act="gh-off">Disconnect</button></div>`;
+  if (g.note) h += `<div class="health warn" role="status"><b>Token not kept</b><span>${esc(g.note)}</span></div>`;
+  if (!g.isPrivate) h += `<div class="health warn" role="alert"><b>This repo is public</b><span>Anyone can see the registry in ${esc(g.conn.repo)}. On GitHub, open the repo's Settings and change its visibility to private.</span></div>`;
+  if (readOnly()) h += `<div class="health" role="status"><b>Look-only</b><span>This token can only read, so this device shows the registry without changing it.</span></div>`;
+  if (g.error) h += `<div class="health ${g.error.kind === 'offline' ? 'warn' : 'bad'}" role="alert"><b>${g.error.kind === 'offline' ? 'Offline' : 'Sync problem'}</b><span>${esc(g.error.text)} Your changes are kept on this device.</span></div>${['auth', 'rights', 'missing'].includes(g.error.kind) ? `<div class="tools"><button class="key" type="button" data-act="gh-retoken">Enter a new token</button></div>` : ''}`;
+  if (g.choice) {
+    const a = g.choice.remote.drawers.length, b = S.drawers.length;
+    h += `<div class="health warn" role="status"><b>${esc(g.conn.repo)} already has a registry</b><span>GitHub has ${a} ${a === 1 ? 'drawer' : 'drawers'}. This device has ${b}. Use one; the other is replaced. GitHub's history keeps its old version.</span></div>
+      <div class="tools"><button class="key" type="button" data-act="gh-usegh">Use GitHub's ${a}</button><button class="key" type="button" data-act="gh-usemine">Replace with this device's ${b}</button></div>`;
+  }
+  if (g.conflict) {
+    const c = g.conflict;
+    h += `<div class="health warn" role="status"><b>Changed on two devices</b><span>Choose which to keep for each. Nothing goes to GitHub until you do.</span></div><div class="conflicts">${c.conflicts.map((x, i) => `<div class="cf"><span class="small"><span class="mono">${esc(x.id)}</span> · ${esc(FIELD[x.field] || x.field)}</span>
+      <div class="segc" role="group" aria-label="Keep for ${esc(x.id)} ${esc(FIELD[x.field] || x.field)}"><button type="button" data-act="gh-keep" data-i="${i}" data-v="mine" aria-pressed="${c.keep[i] === 'mine'}">This device: ${esc(shortVal(x.mine))}</button><button type="button" data-act="gh-keep" data-i="${i}" data-v="theirs" aria-pressed="${c.keep[i] === 'theirs'}">GitHub: ${esc(shortVal(x.theirs))}</button></div></div>`).join('')}</div>
+      <div class="tools"><button class="key" type="button" data-act="gh-resolve">Keep these and sync</button></div>`;
+  }
+  if (g.hold) h += `<div class="health bad" role="alert"><b>Same name or icon on two drawers</b><span>Another device's change and one here now clash. ${esc(g.hold.join(' '))} Change one of them, and it syncs.</span></div>`;
+  return `<div class="gh" id="github">${h}</div>`;
+}
 
 /* ---- Drawers (Area 1) ---- */
 function allChecks() {
@@ -72,7 +207,7 @@ function card(d) {
       <input type="checkbox" data-act="pick" data-id="${esc(d.id)}" ${on ? 'checked' : ''} aria-label="Select drawer ${esc(d.id)} to print">
       <span class="id">${esc(d.id)}</span>
       ${d.icon_weak ? '<span class="wk">Weak icon</span>' : ''}
-      <select data-act="status" data-id="${esc(d.id)}" aria-label="Status of drawer ${esc(d.id)}">${['built', 'printed', 'installed'].map((s) => `<option value="${s}"${d.status === s ? ' selected' : ''}>${s[0].toUpperCase() + s.slice(1)}</option>`).join('')}</select>
+      <select data-act="status" data-id="${esc(d.id)}" ${readOnly() ? 'disabled' : ''} aria-label="Status of drawer ${esc(d.id)}">${['built', 'printed', 'installed'].map((s) => `<option value="${s}"${d.status === s ? ' selected' : ''}>${s[0].toUpperCase() + s.slice(1)}</option>`).join('')}</select>
     </div>
   </div>`;
 }
@@ -94,17 +229,17 @@ function area1() {
   let body = '';
   if (!S.storageOk) body += `<div class="health warn" role="status"><b>Not saving</b><span>This browser won't keep your registry. Export before you close it.</span></div>`;
   if (S.importError) body += `<div class="health bad" role="alert"><b>Import refused</b><span>${esc(S.importError)} Your registry hasn't changed.</span></div><div class="tools"><button class="key" type="button" data-act="dismiss">Dismiss</button></div>`;
-  if (S.importing) body += `<div class="health warn" role="status"><b>Replace the registry?</b><span>${esc(S.importing.file)} has ${S.importing.rows.length} drawers with no repeated names or icons. It replaces the ${S.drawers.length} here. Export first if you want to keep them.</span></div><div class="tools"><button class="key" type="button" data-act="import-yes">Replace ${S.drawers.length} with ${S.importing.rows.length}</button><button class="key" type="button" data-act="import-no">Cancel</button></div>`;
-  if (S.confirmFresh) body += `<div class="health warn" role="status"><b>Start fresh?</b><span>This clears all ${S.drawers.length} drawers from this browser. Export first if you want to keep them.</span></div><div class="tools"><button class="key danger" type="button" data-act="fresh-yes">Clear ${S.drawers.length} drawers</button><button class="key" type="button" data-act="fresh-no">Cancel</button></div>`;
+  if (S.importing) body += `<div class="health warn" role="status"><b>Replace the registry?</b><span>${esc(S.importing.file)} has ${S.importing.rows.length} drawers with no repeated names or icons. It replaces the ${S.drawers.length} here${S.gh.conn ? `, and on GitHub too. GitHub's history keeps the old one` : ''}. Export first if you want to keep them.</span></div><div class="tools"><button class="key" type="button" data-act="import-yes">Replace ${S.drawers.length} with ${S.importing.rows.length}</button><button class="key" type="button" data-act="import-no">Cancel</button></div>`;
+  if (S.confirmFresh) body += `<div class="health warn" role="status"><b>Start fresh?</b><span>This clears all ${S.drawers.length} drawers from this browser${S.gh.conn ? `, and from GitHub too. GitHub's history keeps the old registry` : ''}. Export first if you want to keep them.</span></div><div class="tools"><button class="key danger" type="button" data-act="fresh-yes">Clear ${S.drawers.length} drawers</button><button class="key" type="button" data-act="fresh-no">Cancel</button></div>`;
   if (S.undo) body += `<div class="health" role="status"><b>Removed ${esc(S.undo.d.id)} ${esc(S.undo.d.name)}</b><span></span><button class="key" type="button" data-act="undo">Undo</button></div>`;
   if (S.examples && S.drawers.length) body += `<div class="health" role="status"><b>Example drawers</b><span>These ${S.drawers.length} show how labels look. Edit them, or use Start fresh to begin your own list.</span></div>`;
   if (!S.drawers.length) {
-    body += `<div class="stack" style="align-items:flex-start;padding-block:34px"><p style="margin:0">No drawers yet. Add the first one or import a registry.</p><div class="tools"><button class="key go" type="button" data-act="new">New drawer</button><label class="key">Import<input class="sr" type="file" accept=".csv,.json" data-act="import"></label></div></div>`;
+    body += `<div class="stack" style="align-items:flex-start;padding-block:34px"><p style="margin:0">No drawers yet. Add the first one or import a registry.</p>${readOnly() ? '' : '<div class="tools"><button class="key go" type="button" data-act="new">New drawer</button><label class="key">Import<input class="sr" type="file" accept=".csv,.json" data-act="import"></label></div>'}</div>`;
   } else {
     body += `<div class="tools" role="group" aria-label="Filters"><div class="segc" role="group" aria-label="Status">${seg('all', 'All')}${seg('built', 'Built')}${seg('printed', 'Printed')}${seg('installed', 'Installed')}</div>
       <label class="small" style="display:inline-flex;align-items:center;gap:5px"><input type="checkbox" data-act="weak" ${S.weakOnly ? 'checked' : ''} style="margin:0;accent-color:var(--ink)"> Weak icons only</label>
       <span class="sp"></span><button class="key" type="button" data-act="pickall">${list.length && list.every((d) => S.picked.has(d.id)) ? 'Clear selection' : 'Select all to print'}</button>
-      <button class="key go" type="button" data-act="new" style="height:34px;font-size:var(--t-cap)">New drawer</button></div>`;
+      ${readOnly() ? '' : '<button class="key go" type="button" data-act="new" style="height:34px;font-size:var(--t-cap)">New drawer</button>'}</div>`;
     if (!list.length) body += `<div class="stack" style="align-items:flex-start;padding-block:34px"><p style="margin:0">Nothing matches these filters.</p><button class="key" type="button" data-act="clearfilter">Clear filters</button></div>`;
     for (const g of groups(list)) body += `<div class="group"><div class="ghead"><b>${esc(g.name)}</b><span>${g.note}</span></div><div class="grid">${g.items.map(card).join('')}</div></div>`;
   }
@@ -115,12 +250,13 @@ function area1() {
         <label class="f"><span>Cabinet standard</span><select class="in" data-act="standard" aria-label="Cabinet standard">${STANDARDS.map((s) => `<option value="${s.key}"${s === S.std ? ' selected' : ''}>${esc(s.name)}</option>`).join('')}</select></label>
         ${S.std.sizes.map((z) => `<div class="rd"><span>${esc(z.name)}</span><b>${z.card.w} × ${z.card.h} · ${z.holder === false ? 'no holder, label uses the whole card' : `window ${z.window.w} × ${z.window.h}`}${z.windowMeasured ? '' : ', not measured'}</b></div>`).join('')}
         <div class="tools" style="justify-content:flex-end">
-          <label class="key">Import<input class="sr" type="file" accept=".csv,.json" data-act="import"></label>
+          ${readOnly() ? '' : '<label class="key">Import<input class="sr" type="file" accept=".csv,.json" data-act="import"></label>'}
           <button class="key" type="button" data-act="csv">Export CSV</button>
           <button class="key" type="button" data-act="json">Export JSON</button>
-          <button class="key" type="button" data-act="fresh">Start fresh</button>
+          ${readOnly() ? '' : '<button class="key" type="button" data-act="fresh">Start fresh</button>'}
         </div>
       </div>
+      ${githubArea()}
       ${body}
     </div>
   </section>`;
@@ -456,17 +592,33 @@ const actions = {
   json: () => exportRegistry('json'),
   fresh: () => { S.confirmFresh = true; },
   'fresh-no': () => { S.confirmFresh = false; },
-  'fresh-yes': () => { S.drawers = []; S.units = false; S.examples = false; S.confirmFresh = false; S.picked.clear(); S.undo = null; persist(); },
-  'import-yes': () => { S.units = S.importing.rows.every((d) => UNITS.some((u) => u.test(d.id))); S.drawers = withSizes(S.importing.rows, unitsNow()); S.importing = null; S.examples = false; S.picked.clear(); persist(); },
+  'fresh-yes': () => { S.drawers = []; S.units = false; S.examples = false; S.confirmFresh = false; S.picked.clear(); S.undo = null; persist(); syncSoon(); },
+  'import-yes': () => { S.units = S.importing.rows.every((d) => UNITS.some((u) => u.test(d.id))); S.drawers = withSizes(S.importing.rows, unitsNow()); S.importing = null; S.examples = false; S.picked.clear(); persist(); syncSoon(); },
   'import-no': () => { S.importing = null; },
-  dismiss: () => { S.importError = ''; }
+  dismiss: () => { S.importError = ''; },
+  'gh-open': () => { S.gh.form = { repo: store.loadSync()?.repo || '', token: '', error: '', busy: false }; keepFocus('#ghRepo'); },
+  'gh-cancel': () => { S.gh.form = null; },
+  'gh-connect': () => connect(),
+  'gh-sync': () => syncNow(),
+  'gh-off': () => disconnect(),
+  'gh-retoken': () => { const repo = S.gh.conn.repo; clearTimeout(syncTimer); S.gh.conn = null; S.gh.error = null; S.gh.state = 'off'; S.gh.form = { repo, token: '', error: '', busy: false }; keepFocus('#ghToken'); },
+  'gh-usegh': () => choose(false),
+  'gh-usemine': () => choose(true),
+  'gh-keep': (el) => { S.gh.conflict.keep[+el.dataset.i] = el.dataset.v; },
+  'gh-resolve': () => {
+    const c = S.gh.conflict, kept = resolve(c.merged, c.conflicts, c.keep);
+    applyRecord(kept); store.saveSync({ repo: S.gh.conn.repo, sha: c.remoteSha, base: c.remote });
+    S.gh.conflict = null; return syncNow();
+  }
 };
+// FC-R83: a look-only device can't change the registry
+const EDITS = new Set(['new', 'edit', 'save', 'remove', 'undo', 'fresh', 'fresh-yes', 'import-yes', 'markprinted']);
 
 app.addEventListener('click', (e) => {
   const el = e.target.closest('button[data-act]');
   if (!el || el.disabled) return;
   const act = actions[el.dataset.act];
-  if (!act) return;
+  if (!act || (readOnly() && EDITS.has(el.dataset.act))) return;
   S.undo = el.dataset.act === 'undo' || el.dataset.act === 'remove' ? S.undo : null;
   const r = act(el);
   if (!(r instanceof Promise)) draw();
@@ -478,13 +630,14 @@ app.addEventListener('change', (e) => {
   else if (a === 'weak') { S.weakOnly = el.checked; draw(); }
   else if (a === 'weakflag') { S.flow.draft.icon_weak = el.checked; }
   else if (a === 'size') { S.flow.draft.size = el.value; S.flow.sizeSet = true; $('flowPreview').innerHTML = previewFig(S.flow); }
-  else if (a === 'status') { const d = S.drawers.find((x) => x.id === el.dataset.id); d.status = el.value; d.updated = today(); changed(); draw(); }
-  else if (a === 'standard') { S.std = standardByKey(el.value); persist(); draw(); }
+  else if (a === 'status' && !readOnly()) { const d = S.drawers.find((x) => x.id === el.dataset.id); d.status = el.value; d.updated = today(); changed(); draw(); }
+  else if (a === 'standard') { S.std = standardByKey(el.value); persist(); syncSoon(); draw(); }
   else if (a === 'import' && el.files[0]) importFile(el.files[0]);
 });
 
 app.addEventListener('input', (e) => {
   const f = S.flow, el = e.target;
+  if (el.id === 'ghRepo' || el.id === 'ghToken') { S.gh.form[el.id === 'ghRepo' ? 'repo' : 'token'] = el.value; return; }
   if (!f) return;
   const set = (k) => {
     f.draft[k] = el.value;
@@ -508,6 +661,10 @@ function draw() {
   led('drawers', S.drawers.length ? 'ok' : '');
   led('checks', !S.drawers.length ? '' : holds ? 'fault' : notes ? 'busy' : 'ok');
   led('print', S.job?.busy ? 'busy' : S.job?.done ? 'ok' : S.job?.error ? 'fault' : '');
+  // FC-U13
+  const g = S.gh, n = g.conn && store.loadSync()?.base ? waiting(store.loadSync().base, record()) : 0;
+  led('sync', !g.conn ? '' : g.state === 'synced' || g.state === 'readonly' ? 'ok' : g.state === 'attention' ? 'fault' : 'busy');
+  $('sync-word').textContent = !g.conn ? 'Sync off' : { saving: 'Saving', synced: n ? 'Saving' : 'Synced', offline: `Offline · ${n} waiting`, readonly: 'Read only', attention: 'Needs attention' }[g.state] || 'Sync';
   if (had) app.querySelector(`[data-act="${had}"]`)?.focus();
 }
 
@@ -528,6 +685,10 @@ async function start() {
     S.drawers = SEED.map((d) => ({ ...d }));
     if (S.storageOk) store.clear();
   }
+  const conn = store.loadGitHub();
+  if (conn?.repo && conn?.token) { S.gh.conn = conn; S.gh.state = 'saving'; }
   draw();
+  if (S.gh.conn) syncNow();
+  addEventListener('online', () => { if (S.gh.conn) syncNow(); });
 }
 start();

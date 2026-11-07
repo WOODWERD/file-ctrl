@@ -4,7 +4,7 @@ Make drawer-front labels for file cabinets, starting with BISLEY. Enter a drawer
 
 **Printer required.** You need a [Liene PixCut S1](https://www.liene-life.com/products/pixcut-s1-photo-sticker-printer-and-cutter) to print and cut these labels. It's the only printer File Ctrl is tested on. The Letter and A4 PDFs print on any printer, and you cut those by hand.
 
-Everything runs in your browser. It makes no network requests after it loads, and your registry never leaves your computer.
+Everything runs in your browser. It makes no network requests after it loads unless you connect your own private GitHub repo, and then only to that repo, to sync the registry as `file-ctrl.json`. See the guide's Storing it on GitHub section, and [Set up GitHub](https://woodwerd.github.io/github.html).
 
 Live at https://woodwerd.github.io/file-ctrl/ once published. To run it locally:
 

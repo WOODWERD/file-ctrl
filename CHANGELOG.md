@@ -2,6 +2,14 @@
 
 What changed in each version of [File Ctrl](https://woodwerd.github.io/file-ctrl/), newest first. Versions are x-numbers while File Ctrl is a public beta.
 
+## x0.0.7 · 2026-11-06
+- GitHub storage. Connect File Ctrl to a private GitHub repo of your own, under Drawers, and the registry syncs between your devices as one file, `file-ctrl.json`, with a commit for every change. It's optional; without it nothing changes.
+- A Sync light in the header says Synced, Saving, Offline with how many changes are waiting, Read only, or Needs attention.
+- Changes on two devices merge drawer by drawer. If both changed the same thing, File Ctrl shows both and you choose. A name or icon used twice never reaches GitHub.
+- A token that can only read makes that device look-only: it shows and prints the registry but can't change it. Handy on a phone.
+- The token stays in this browser, never in an export, the registry or the repo. File Ctrl warns if the repo is public, and only ever reads or writes its own file.
+- The guide has a new Storing it on GitHub section, linking to [Set up GitHub](https://woodwerd.github.io/github.html).
+
 ## x0.0.6 · 2026-11-06
 - Desktop 3-drawer labels are confirmed: the holder is the same as the 10-drawer, so drawers D1 to D3 use the MultiDrawer card with no note.
 - File cabinet labels use the whole card. The file cabinet has no holder, just the handle area on the front, so text has about 2 mm more width and 4 mm more height to sit in, and the note about an unmeasured window is gone.

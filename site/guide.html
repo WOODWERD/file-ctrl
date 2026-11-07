@@ -54,6 +54,7 @@
         <li><b><a href="https://woodwerd.github.io/tool-ctrl/">Tool Ctrl</a></b><p>Every tool box you own, and what's in it.</p></li>
         <li><b><a href="https://woodwerd.github.io/stack-ctrl/">Stack Ctrl</a></b><p>Your Systainers, stacked to scale.</p></li>
         <li><b><a href="https://woodwerd.github.io/photo-ctrl/">Photo Ctrl</a></b><p>Photos of your tool boxes, read by your own Claude.</p></li>
+        <li class="soon"><b>Filament Ctrl</b> <span class="tag">In progress</span><p>Filament on hand, and what's in the printer.</p></li>
       </ul>
       <h2>Shared <em>— parts the other tools use</em></h2>
       <ul>
@@ -67,7 +68,7 @@
   <div class="brand">
     <h1>File Ctrl</h1>
     <span class="by">Drawer labels for file cabinets</span>
-    <span class="by mono">· x0.0.6</span>
+    <span class="by mono">· x0.0.7</span>
   </div>
   <div class="leds" aria-live="polite">
     <span class="led" id="led-drawers"><i></i>Drawers</span>
@@ -90,7 +91,7 @@
 </ul></section>
 <section><h2>What File Ctrl does</h2>
 <p>You enter a drawer's ID, name and contents. File Ctrl checks the name, finds an icon no other drawer uses, shows the label as it looks through the holder, and saves files ready to print.</p>
-<p>It starts with one cabinet standard, BISLEY, in two card sizes: MultiDrawer, a 47 × 25 mm card with a 42 × 18 mm window, and File cabinet, a 95 × 25 mm card with no holder, so the label uses the whole card. Each drawer has its own card size, and you can change it while editing. Your list stays in this browser, so use Export CSV as your real save.</p></section>
+<p>It starts with one cabinet standard, BISLEY, in two card sizes: MultiDrawer, a 47 × 25 mm card with a 42 × 18 mm window, and File cabinet, a 95 × 25 mm card with no holder, so the label uses the whole card. Each drawer has its own card size, and you can change it while editing. Your list stays in this browser, so use Export CSV as your real save, or connect your own GitHub repo.</p></section>
 <section><h2>Make a label</h2><ol>
 <li>Choose New drawer and enter an ID.</li><li>Enter a name and contents. One word reads best, with 3 to 5 items.</li>
 <li>Check the name. File Ctrl compares it with your other drawers. It only suggests, and never renames.</li>
@@ -111,7 +112,26 @@
 <h3 class="micro">Your own icons</h3>
 <p>Paste an SVG in Icon Ctrl's style: 24 × 24 viewBox, fill currentColor with fill-rule evenodd, no stroke, artwork within 1 to 23, and no text. File Ctrl names anything that doesn't fit.</p></section>
 <section><h2>The registry file</h2>
-<p>CSV and JSON use these columns: <code>id, name, contents, icon, icon_source, custom_svg, icon_weak, version, status, updated</code>. <code>id</code> and <code>name</code> are required. <code>status</code> is built, printed or installed. No two rows may share an ID, a name or an icon.</p></section>
+<p>CSV and JSON use these columns: <code>id, name, contents, icon, icon_source, custom_svg, icon_weak, version, status, updated, size</code>. <code>id</code> and <code>name</code> are required. <code>status</code> is built, printed or installed. No two rows may share an ID, a name or an icon.</p></section>
+<section id="github"><h2>Storing it on GitHub</h2>
+<p>This is optional. A private GitHub repo of your own holds the registry as one file, <code>file-ctrl.json</code>, syncs it between your computer, iPad and phone, and keeps a history of every change. You need a free GitHub account. Nothing goes anywhere else.</p>
+<p>New to GitHub? Follow <a href="https://woodwerd.github.io/github.html">Set up GitHub</a>, step by step, in the WOODWERD Toolkit Guides. The short version:</p>
+<ol>
+<li>On GitHub, make a new repository just for File Ctrl, such as <code>file-ctrl-data</code>. Set it to Private.</li>
+<li>Make a fine-grained personal access token. Under Repository access choose Only select repositories, and pick that one repo. Under Repository permissions set Contents to Read and write. Leave everything else as No access. The Make a token on GitHub button in File Ctrl goes straight there.</li>
+<li>Copy the token. GitHub shows it once.</li>
+<li>In File Ctrl, under Drawers, choose Connect to GitHub. Enter the repo as <code>owner/name</code> and paste the token.</li>
+</ol>
+<p>If the repo already holds a registry, File Ctrl asks whether to use GitHub's or replace it with this device's, and says how many drawers each has.</p>
+<h3 class="micro">How it syncs</h3>
+<p>Changes save in this browser at once, and go to GitHub a few seconds later, when File Ctrl opens, and when you press Sync now. Each sync is one commit. The Sync light in the header says Synced, Saving, Offline with the number of changes waiting, Read only, or Needs attention.</p>
+<p>If two devices change different drawers, both changes are kept. If they change the same thing on the same drawer, File Ctrl shows both and you choose. If two devices give different drawers the same name or icon, nothing goes to GitHub until you change one of them.</p>
+<p>A token that's wrong or expired never loses anything. File Ctrl says what to fix, and your changes wait on the device until you enter a new token.</p>
+<h3 class="micro">A phone that only looks</h3>
+<p>To look things up on a phone without changing anything, make a second token for the same repo with Contents set to Read-only. A device with that token shows the registry and can print, but can't add, edit or import. A phone with a read and write token edits like any other device.</p>
+<h3 class="micro">Keep it private</h3>
+<p>Keep the repo private. File Ctrl warns you if it's public. The token stays in this browser only, never in an export, the registry or the repo. Disconnect deletes it from this browser.</p>
+</section>
 <p class="small"><a href="./">Back to File Ctrl</a></p>
 </main>
 
@@ -178,8 +198,8 @@
 </svg></a>
     <span class="tagline">Think · Design · Style</span><a class="ghlink" href="https://github.com/WOODWERD" aria-label="WOODWERD on GitHub" title="WOODWERD on GitHub"><svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor" aria-hidden="true"><path d="M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.45-.55.38A7.995 7.995 0 0 1 0 8c0-4.42 3.58-8 8-8Z"/></svg><span>GitHub</span></a>
   </div>
-  <p><b>File Ctrl x0.0.6</b> · <a href="guide.html">User guide</a> · <a href="https://github.com/WOODWERD/file-ctrl">Source and issues on GitHub</a> · MIT licence · by WOODWERD LLC</p>
-  <p>Runs entirely in your browser. It makes no network requests, and your registry never leaves this computer.</p>
+  <p><b>File Ctrl x0.0.7</b> · <a href="guide.html">User guide</a> · <a href="https://github.com/WOODWERD/file-ctrl">Source and issues on GitHub</a> · MIT licence · by WOODWERD LLC</p>
+  <p>Runs entirely in your browser. It makes no network requests unless you connect your own private GitHub repo, and then only to that repo.</p>
   <p>An independent project, not affiliated with or endorsed by BISLEY or Liene. BISLEY, Liene and PixCut are trademarks of their owners. Icons from <a href="https://woodwerd.github.io/icon-ctrl/">Icon Ctrl</a>, MIT licence.</p>
 </footer>
 </div>

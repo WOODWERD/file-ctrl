@@ -207,3 +207,15 @@ textarea.in{height:89px}
 
 /* phones: hang the All WOODWERD tools menu from the full-width strip, so it can't run off the left edge */
 @media (max-width:767px){details.alltools,details.kitmenu{position:static}.toolmenu{left:0;right:0;width:auto;max-width:none}}
+
+/* GitHub storage (FC-R72, FC-S24 to FC-S27) */
+a.led{text-decoration:none}
+.gh{display:flex;flex-direction:column;gap:13px;border-top:1px solid var(--line);padding-top:13px}
+.ghrow{display:flex;flex-wrap:wrap;gap:8px 13px;align-items:center}
+.ghrow>b{font-weight:600}
+.ghrow>.small{flex:1 1 233px;margin:0}
+.ghform{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,233px),1fr));gap:13px}
+.conflicts{display:flex;flex-direction:column;gap:8px}
+.cf{display:flex;flex-direction:column;gap:5px}
+.cf .segc{flex-wrap:wrap}
+.cf .segc button{white-space:normal;text-align:left;height:auto;min-height:34px}
