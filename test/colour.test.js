@@ -107,3 +107,9 @@ test('sheets and PDF previews fill the ground, with bleed only on coloured cards
   const page = renderPagePreview(fonts, withSize(std, 'multidrawer'), list, icon, PAGES.letter);
   assert.equal((page.match(/fill="#2F3E52"/g) || []).length, 1);
 });
+
+test('FC-R102 the BISLEY finishes are data, each with a start colour that reads', () => {
+  const f = standardByKey('bisley').finishes;
+  assert.ok(f.some((x) => x.name === 'Golden Sunflower Yellow' && x.hex === '#E7AF28'));
+  for (const x of f) { assert.equal(normHex(x.hex), x.hex); assert.equal(readability(x.hex).level, 'ok'); assert.ok(x.source); }
+});

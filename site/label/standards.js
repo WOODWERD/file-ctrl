@@ -6,8 +6,10 @@ export const STANDARDS = [
     prefix: 'BISLEY',
     // BISLEY finishes for label grounds (FC-R102). Only finishes Drew confirms go here (Q19): name, BISLEY code and RAL where
     // known, a start colour, and where it came from. Start colours are estimates until a test strip matches them.
-    // { key: 'goose-grey', name: 'Goose grey', code: '', ral: '', hex: '#A8ADA8', source: 'estimate' }
-    finishes: [],
+    finishes: [
+      // Drew's file cabinet, 2026-11-06. Sampled from the drawer fronts in a BISLEY product photo, so not matched yet.
+      { key: 'golden-sunflower-yellow', name: 'Golden Sunflower Yellow', code: '', ral: '', hex: '#E7AF28', source: 'BISLEY 3-drawer flush front product photo, drawer fronts' }
+    ],
     border: 1.5,                // the Liene adds this per side in Separate mode
     dpi: 300,
     // Card sizes (FC-R18). card is what's cut; window is where ink may go: the holder's opening, or with no holder the whole FILE.

@@ -2,6 +2,9 @@
 
 What changed in each version of [File Ctrl](https://woodwerd.github.io/file-ctrl/), newest first. Versions are x-numbers while File Ctrl is a public beta.
 
+## x0.0.10 · 2026-11-06
+- The first BISLEY finish in the colour menu: Golden Sunflower Yellow. Its start colour comes from a BISLEY product photo, so it's marked not matched until you pick from a test strip.
+
 ## x0.0.9 · 2026-11-06
 - Colour on the label. Each set of drawers can be printed in a colour to match its cabinet. Choose it beside the set's name in the library, or give one drawer its own under Label colour.
 - File Ctrl shows the labels in the new colour before anything changes. Applying it selects them for reprinting, and Undo puts it back.
