@@ -2,6 +2,9 @@
 
 What changed in each version of [File Ctrl](https://woodwerd.github.io/file-ctrl/), newest first. Versions are x-numbers while File Ctrl is a public beta.
 
+## x0.0.17 · 2026-11-18
+- Icon Ctrl's Print set moves to x0.0.10: 193 icons. New is a Health group for a first-aid or medicine drawer, with a first-aid kit, bandages, gauze, medical tape, pill bottles, a thermometer and a blood pressure monitor among them. Also new are computer things such as a laptop, a hard drive, a USB stick and a Wi-Fi router, a phone, tablet, headphones and remote, and coin and 9-volt battery cells. Every icon your drawers already use is unchanged.
+
 ## x0.0.16 · 2026-11-07
 - Icon Ctrl's Print set moves to x0.0.9: 159 icons. New are a printer, a label printer, a 3D printer and a toner cartridge, electrical and double-sided tape, and machine and self-drilling screws. Every icon your drawers already use is unchanged.
 
