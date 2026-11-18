@@ -8,7 +8,7 @@ import { SEED, UNITS, sizeKeyFor, withSizes } from './registry/seed.js';
 import * as store from './registry/store.js';
 import { toCsv, readRegistry, withUid, newUid } from './registry/csv.js';
 import { planMove, applyMove, slotsFor, slotOrder, unitOf } from './registry/move.js';
-import { duplicates, iconUsedBy } from './registry/uniqueness.js';
+import { duplicates, iconUsedBy, iconAlsoOn } from './registry/uniqueness.js';
 import { nameCheck, items } from './check/namecheck.js';
 import { checkSvg } from './check/svgrules.js';
 import { checks, blocked } from './check/checks.js';
@@ -505,9 +505,9 @@ function iconPanel(f) {
   }
   const list = iconResults(f.query);
   const btn = (n) => {
-    const u = iconUsedBy(S.drawers, n, self);
-    const tag = u ? `Used by ${u.id}` : n === d.icon ? 'Selected' : '';
-    return `<button class="icb" type="button" data-act="icon" data-v="${n}" ${u ? 'disabled' : ''} aria-pressed="${n === d.icon}" aria-label="${esc(ICONS[n].name)}${tag ? ', ' + tag : ''}">${glyph(ICONS[n].f)}<span>${n}</span><em>${tag}</em></button>`;
+    const also = iconAlsoOn(S.drawers, n, self).map((x) => x.id), on = also.length ? `Also on ${also.slice(0, 3).join(', ')}${also.length > 3 ? ' …' : ''}` : '';   // FC-R51
+    const tag = on || (n === d.icon ? 'Selected' : '');   // the border already marks the pick
+    return `<button class="icb" type="button" data-act="icon" data-v="${n}" aria-pressed="${n === d.icon}" aria-label="${esc(ICONS[n].name)}${tag ? ', ' + tag : ''}">${glyph(ICONS[n].f)}<span>${n}</span><em>${tag}</em></button>`;
   };
   const size = iconOf(d) ? `<div class="ten">${glyph(iconOf(d))}<span>Shown at 14 mm, the size it prints. Actual size on screen depends on your display.</span></div>` : '';
   const none = !list.length ? `<p class="small">No icons match. Try another word or paste your own.</p>` : '';   // FC-S13

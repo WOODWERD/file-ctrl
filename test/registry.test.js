@@ -5,7 +5,7 @@ import { parseFonts } from '../site/label/fonts.js';
 import { standardByKey, withSize } from '../site/label/standards.js';
 import { SEED, UNITS } from '../site/registry/seed.js';
 import { toCsv, readRegistry } from '../site/registry/csv.js';
-import { duplicates, iconUsedBy, nameUsedBy } from '../site/registry/uniqueness.js';
+import { duplicates, iconUsedBy, iconAlsoOn, nameUsedBy } from '../site/registry/uniqueness.js';
 import { nameCheck } from '../site/check/namecheck.js';
 import { checkSvg } from '../site/check/svgrules.js';
 import { checks, blocked } from '../site/check/checks.js';
@@ -16,15 +16,19 @@ const fonts = parseFonts(buf('site/fonts/InterTight-700.ttf'), buf('site/fonts/I
 const std = standardByKey('bisley');
 const row = (o) => ({ id: '11', name: '', contents: '', icon: 'kit', icon_source: 'iconctrl', custom_svg: '', icon_weak: false, version: 'v3', status: 'built', updated: '', size: '', ground: '', ground_name: '', ...o });
 
-test('FC-A06 and FC-A07 names and icons stay unique', () => {
+test('FC-A06 names stay unique, and FC-A07 icons can repeat with a note', () => {
   assert.equal(nameUsedBy(SEED, 'solder', '11').id, '03');
   assert.equal(nameUsedBy(SEED, 'Solder', '03'), undefined);
   assert.equal(iconUsedBy(SEED, 'dev-board', '11').id, '07');
   assert.equal(iconUsedBy(SEED, 'dev-board', '07'), undefined);
   assert.ok(blocked(checks(fonts, std, row({ name: 'Solder', icon: 'nut' }), SEED, UNITS)));
-  assert.ok(blocked(checks(fonts, std, row({ name: 'Parts', icon: 'dev-board' }), SEED, UNITS)));
+  const k = checks(fonts, std, row({ name: 'Parts', icon: 'dev-board' }), SEED, UNITS);
+  assert.ok(!blocked(k));
+  assert.ok(k.some((c) => c.id === 'FC-K14' && /^Icon also on 07 Boards\.$/.test(c.text)));
+  assert.deepEqual(iconAlsoOn([...SEED, row({ id: 'D9', name: 'More', icon: 'dev-board' })], 'dev-board', '11').map((d) => d.id), ['07', 'D9']);
   assert.equal(duplicates(SEED).length, 0);
-  assert.equal(duplicates([...SEED, row({ name: 'Solder', icon: 'dev-board' })]).length, 2);
+  assert.equal(duplicates([...SEED, row({ name: 'Solder', icon: 'dev-board' })]).length, 1);
+  assert.equal(duplicates([...SEED, row({ name: 'Parts', icon: 'dev-board' })]).length, 0);
 });
 
 test('FC-A09 seeds raise no suggestions', () => {

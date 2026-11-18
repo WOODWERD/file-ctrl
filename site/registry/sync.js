@@ -96,7 +96,7 @@ export function waiting(base, local) {
 }
 
 // base: the registry as last synced; sha: GitHub's version of it. readOnly never commits (FC-R83).
-// Returns synced, conflict (FC-S25, fields), hold (FC-S25, a name or icon used twice) or error (FC-S26).
+// Returns synced, conflict (FC-S25, fields), hold (FC-S25, a name used twice) or error (FC-S26).
 export async function syncOnce({ gh, repo, local, base, sha, readOnly = false }) {
   for (let attempt = 0; attempt < 3; attempt++) {
     const rem = await gh.readRecord();
@@ -120,7 +120,7 @@ export async function syncOnce({ gh, repo, local, base, sha, readOnly = false })
       next = m.record;
       base = rem.record; sha = rem.sha;
     }
-    // FC-R80: never write a registry with a name or icon used twice. The merged one is kept on the device to fix there.
+    // FC-R80: never write a registry with a name used twice. The merged one is kept on the device to fix there.
     const dups = duplicates(next.drawers);
     if (dups.length) return { status: 'hold', record: next, base, sha, dups };
     if (same(next, base)) return { status: 'synced', record: next, base, sha, wrote: false };

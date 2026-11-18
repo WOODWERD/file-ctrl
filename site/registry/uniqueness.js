@@ -1,13 +1,15 @@
-// One row per ID, and no two rows share a name or an icon (FC-R21).
+// One row per ID, and no two rows share a name (FC-R21). Icons can repeat (FC-R51).
 const key = (s) => String(s || '').trim().toLowerCase();
 
 export const nameUsedBy = (drawers, name, self) => drawers.find((d) => d.id !== self && key(d.name) === key(name));
 export const iconUsedBy = (drawers, icon, self) => (icon ? drawers.find((d) => d.id !== self && d.icon === icon) : undefined);
+// Every other drawer with this icon, in registry order (FC-R51, FC-K14)
+export const iconAlsoOn = (drawers, icon, self) => (icon ? drawers.filter((d) => d.id !== self && d.icon === icon) : []);
 
 // Plain sentences, each naming the rows, for a file that breaks the rules
 export function duplicates(drawers) {
   const out = [];
-  for (const [field, word] of [['id', 'ID'], ['name', 'name'], ['icon', 'icon'], ['uid', 'drawer key']]) {
+  for (const [field, word] of [['id', 'ID'], ['name', 'name'], ['uid', 'drawer key']]) {
     const seen = new Map();
     drawers.forEach((d, i) => {
       const k = key(d[field]);

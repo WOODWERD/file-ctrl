@@ -108,21 +108,25 @@ test('FC-A43 the same field on two devices asks, and the kept value goes up', as
   assert.equal(JSON.parse(g.store[RECORD_PATH].text).drawers.find((d) => d.id === '05').contents, 'From the iPad');
 });
 
-test('FC-A44 two devices give different drawers the same icon: held, nothing written', async () => {
+test('FC-A44 two devices give different drawers the same name: held; the same icon syncs', async () => {
   const g = fakeGitHub(); const gh = client(REPO, TOKEN, g.fetchFn);
   const first = await syncOnce({ gh, repo: REPO, local: reg(), base: null, sha: null });
-  await syncOnce({ gh, repo: REPO, local: withRow(first.record, '05', { icon: 'jigsaw' }), base: first.base, sha: first.sha });
+  await syncOnce({ gh, repo: REPO, local: withRow(first.record, '05', { name: 'Parts' }), base: first.base, sha: first.sha });
   const before = g.store[RECORD_PATH].sha;
-  const b = await syncOnce({ gh, repo: REPO, local: withRow(first.record, '07', { icon: 'jigsaw' }), base: first.base, sha: first.sha });
-  assert.equal(b.status, 'hold'); assert.match(b.dups.join(' '), /icon jigsaw/);
+  const b = await syncOnce({ gh, repo: REPO, local: withRow(first.record, '07', { name: 'Parts' }), base: first.base, sha: first.sha });
+  assert.equal(b.status, 'hold'); assert.match(b.dups.join(' '), /name parts/);
   assert.equal(g.store[RECORD_PATH].sha, before);
   // Fixing one drawer on this device lets it go
-  const fixed = withRow(b.record, '07', { icon: 'dev-board' });
+  const fixed = withRow(b.record, '07', { name: 'Boards' });
   const s = await syncOnce({ gh, repo: REPO, local: fixed, base: b.base, sha: b.sha });
   assert.equal(s.status, 'synced');
+  // FC-R51: two drawers with one icon is fine
+  const i1 = await syncOnce({ gh, repo: REPO, local: withRow(s.record, '05', { icon: 'jigsaw' }), base: s.base, sha: s.sha });
+  const i2 = await syncOnce({ gh, repo: REPO, local: withRow(s.record, '07', { icon: 'jigsaw' }), base: s.base, sha: s.sha });
+  assert.equal(i1.status, 'synced'); assert.equal(i2.status, 'synced');
   const onGh = JSON.parse(g.store[RECORD_PATH].text).drawers;
   assert.equal(onGh.find((d) => d.id === '05').icon, 'jigsaw');
-  assert.equal(onGh.find((d) => d.id === '07').icon, 'dev-board');
+  assert.equal(onGh.find((d) => d.id === '07').icon, 'jigsaw');
 });
 
 test('FC-R79 a drawer removed on one device and changed on the other is kept', () => {

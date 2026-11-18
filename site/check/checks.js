@@ -1,5 +1,5 @@
 // Plain-language checks next to the label (FC-K01 to FC-K10). hold blocks save; note doesn't.
-import { nameUsedBy, iconUsedBy } from '../registry/uniqueness.js';
+import { nameUsedBy, iconAlsoOn } from '../registry/uniqueness.js';
 import { derive } from '../label/geometry.js';
 import { fitLabel } from '../label/fit.js';
 import { isOldIcon } from '../icons/legacy.js';
@@ -21,8 +21,8 @@ export function checks(fonts, std, d, drawers, units) {
   if (f.contentsOver) note('FC-K04', `Contents run to ${f.lines.length} lines. Trim the list.`);
   const n = nameUsedBy(drawers, d.name, d.id);
   if (d.name && n) hold('FC-K05', `Name already used by ${n.id}.`);
-  const i = iconUsedBy(drawers, d.icon, d.id);
-  if (i) hold('FC-K05', `Icon already used by ${i.id}.`);
+  const also = iconAlsoOn(drawers, d.icon, d.id);
+  if (also.length) note('FC-K14', `Icon also on ${also.map((x) => `${x.id} ${x.name}`.trim()).join(', ')}.`);
   if (units.length) {
     const u = units.find((x) => x.test(d.id));
     if (d.id && !u) note('FC-K06', `ID ${d.id} isn't in 01 to 10, D1 to D3 or F1 to F3.`);

@@ -2,6 +2,10 @@
 
 What changed in each version of [File Ctrl](https://woodwerd.github.io/file-ctrl/), newest first. Versions are x-numbers while File Ctrl is a public beta.
 
+## x0.0.18 · 2026-11-18
+- An icon can now go on more than one drawer. The picker shows where it's already used, such as Also on 07, and the proof adds a note, Icon also on 07 Boards, instead of holding the save.
+- Names still can't repeat.
+
 ## x0.0.17 · 2026-11-18
 - Icon Ctrl's Print set moves to x0.0.10: 193 icons. New is a Health group for a first-aid or medicine drawer, with a first-aid kit, bandages, gauze, medical tape, pill bottles, a thermometer and a blood pressure monitor among them. Also new are computer things such as a laptop, a hard drive, a USB stick and a Wi-Fi router, a phone, tablet, headphones and remote, and coin and 9-volt battery cells. Every icon your drawers already use is unchanged.
 
